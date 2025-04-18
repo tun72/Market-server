@@ -8,29 +8,25 @@ dotenv.config();
 
 const path = require("path");
 
-// csrf token set up
-const csrf = require("csurf");
-const csrfProtect = csrf();
 
 const app = express();
+
+
+// routes import
+const productRoute = require("./routes/productRoutes")
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// csrf setup
-app.use(csrfProtect);
-app.use((req, res, next) => {
-  res.locals.csrfToken = req.csrfToken();
-  next();
-});
+
+// routes
+app.use("/api/v1/products", productRoute)
+
 
 // for 404 routes
-app.all("*", (req, res) => {
-  return res.send("404");
-});
-
-// to handel errors
-// app.use();
+// app.all("*", (req, res) => {
+//   return res.send("404");
+// });
 
 const PORT = process.env.PORT || 3000;
 
