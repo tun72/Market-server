@@ -1,7 +1,7 @@
 const express = require("express");
 const { Product, Brand, Category, Variation } = require("../models/productSchema");
 
-const router = express.Router();
+    const router = express.Router();
 
 router.get("/", async (req, res) => {
     console.log("hit");
