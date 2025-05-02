@@ -1,4 +1,6 @@
 const express = require("express");
+const { json } = require("express");
+
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 
@@ -8,20 +10,19 @@ dotenv.config();
 
 const path = require("path");
 
-
 const app = express();
 
-
 // routes import
-const productRoute = require("./routes/productRoutes")
+const productRoute = require("./routes/productRoutes");
+const categoryRoute = require("./routes/categoryRoutes")
 
 app.use(express.static(path.join(__dirname, "public")));
+app.use(json())
 app.use(bodyParser.urlencoded({ extended: false }));
 
-
 // routes
-app.use("/api/v1/products", productRoute)
-
+app.use("/api/v1/products", productRoute);
+app.use("/api/v1/categories", categoryRoute);
 
 // for 404 routes
 // app.all("*", (req, res) => {
