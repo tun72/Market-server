@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node --watch app.js",
+    "start": "nodemon server",
     "test": "echo \"Error: no test specified\" && exit 1",
     "server": "nodemon server"
   },
@@ -12,13 +12,20 @@
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.2",
     "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
     "csurf": "^1.11.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-validator": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.6.2",
     "mongoose": "^8.4.0",
-    "nodemon": "^3.1.9"
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.2",
+    "nodemon": "^3.1.9",
+    "sharp": "^0.34.1",
+    "socket.io": "^4.8.1"
   }
 }

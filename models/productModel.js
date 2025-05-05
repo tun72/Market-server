@@ -98,12 +98,15 @@ const ProductSchema = new Schema({
     brand: {
         type: ObjectId,
         ref: 'Brand',
-        required: [true, 'Brand reference is required']
+        default: null
     },
     category: {
         type: ObjectId,
         ref: 'Category',
         required: [true, 'Category reference is required']
+    },
+    coverImage: {
+        type: String
     },
     images: [{
         type: String,
@@ -148,14 +151,25 @@ const ProductSchema = new Schema({
         title: { type: String, trim: true, maxlength: 150 },
         description: { type: String, trim: true, maxlength: 300 }
     },
-    relatedProducts: [{
-        type: ObjectId,
-        ref: 'Product'
-    }],
+    // relatedProducts: [{
+    //     type: ObjectId,
+    //     ref: 'Product'
+    // }],
     status: {
         type: String,
-        enum: ['draft', 'active', 'archived', 'discontinued'],
-        default: 'draft'
+        default: 'pending',
+        validate: {
+            validator: function (v) {
+                return ['pending', 'active', 'archived'].includes(v);
+            },
+            message: props => `${props.value} is not a valid status. Valid values are: ${['pending', 'active', 'archived'].join(', ')}`
+        }
+    },
+
+    seller: {
+        type: ObjectId,
+        ref: "Seller",
+        required: [true, 'Product must have marchant']
     }
 }, {
     timestamps: true,
@@ -190,7 +204,7 @@ const variationSchema = new Schema({
             required: true,
             uppercase: true,
             enum: ['USD', 'EUR', 'GBP', 'JPY', "MMK"],
-            default: 'USD'
+            default: 'MMK'
         },
         salePrice: {
             type: Number,
