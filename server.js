@@ -1,4 +1,6 @@
 const express = require("express");
+const { json } = require("express");
+
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
@@ -12,6 +14,7 @@ const globalErrorController = require("./controllers/errorController");
 const productRoute = require("./routes/productRoutes")
 const authRoute = require("./routes/authRoute");
 const adminRoute = require("./routes/adminRoute")
+const categoryRoute = require("./routes/categoryRoutes")
 
 
 // dot env config
@@ -21,7 +24,6 @@ dotenv.config();
 const path = require("path");
 const Admin = require("./models/adminModel");
 const { setupSocket } = require("./socket");
-
 
 const app = express();
 
@@ -38,6 +40,8 @@ app.use(bodyParser.json());
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
+// routes import
+
 
 
 // routes
@@ -45,6 +49,7 @@ app.use("/api/v1/products", productRoute);
 app.use("/api/v1/auth", authRoute);
 
 app.use("/api/v1/admin", adminRoute);
+app.use("/api/v1/categories", categoryRoute);
 
 // for 404 routes
 // app.all("*", (req, res) => {

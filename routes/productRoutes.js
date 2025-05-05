@@ -3,7 +3,7 @@ const productController = require("../controllers/productController");
 const upload = require("../utils/upload");
 // const { Product, Brand, Category, Variation } = require("../models/productSchema");
 
-const router = express.Router();
+    const router = express.Router();
 
 // router.get("/", async (req, res) => {
 
