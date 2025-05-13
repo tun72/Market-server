@@ -50,7 +50,9 @@ exports.getOne = ({ Model, fields = [] }) =>
 
 exports.createOne = Model =>
     catchAsync(async (req, res, next) => {
-        const doc = await Model.create(req.body);
+        const doc = new Model(req.body);
+
+        await doc.save()
 
         res.status(201).json({
             status: "success",

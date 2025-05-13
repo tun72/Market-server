@@ -6,6 +6,7 @@ const {
   deleteCategoriesController,
 } = require("../controllers/categoryController.js");
 
+
 const router = express.Router();
 
 router.get("/", getAllCategoriesController);

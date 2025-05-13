@@ -6,6 +6,8 @@ const fileDelete = async (path) => {
 
     await fs.unlink(path);
   } catch (err) {
+    console.log(err);
+
     return null;
   }
 };

@@ -1,0 +1,14 @@
+Version 1 pending for version 2
+1. Seller subscription
+2. 5% Percentage per products
+
+Version 2
+1. ai checking for seller post products
+2. ai product recommendation for user.
+3. user -> amount  for buying prodcut.
+4. ai recommendation seller
+
+
+version 2
+validator -> admin -> create event -> date validator -> customize
+

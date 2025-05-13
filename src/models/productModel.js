@@ -15,6 +15,13 @@ const brandSchema = new Schema({
     timestamps: true,
 });
 
+const typeSchema = new Schema({
+    name: { type: String, required: true, unique: true },
+    slug: { type: String, required: true, unique: true },
+    createdAt: { type: Date, default: Date.now },
+});
+
+
 const categorySchema = new Schema({
     name: {
         type: String,
@@ -24,10 +31,10 @@ const categorySchema = new Schema({
         maxlength: [100, 'Category name cannot exceed 100 characters'],
         index: true
     },
-    parent: {
+    typeId: {
         type: ObjectId,
-        ref: 'Category',
-        default: null
+        ref: 'Type',
+        require: true
     },
     isActive: {
         type: Boolean,
@@ -39,10 +46,10 @@ const categorySchema = new Schema({
     toObject: { virtuals: true }
 });
 
-categorySchema.virtual('subcategories', {
-    ref: 'Category',
+typeSchema.virtual('categories', {
+    ref: 'Type',
     localField: '_id',
-    foreignField: 'parent'
+    foreignField: 'typeId'
 });
 
 
@@ -259,6 +266,7 @@ const variationSchema = new Schema({
 
 module.exports = {
     Brand: model('Brand', brandSchema),
+    Type: model("Type", typeSchema),
     Category: model('Category', categorySchema),
     Variation: model('Variation', variationSchema),
     Product: model('Product', ProductSchema),
