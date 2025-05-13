@@ -1,0 +1,34 @@
+delivery 
+
+location counter for user only Yangon, Ayawaddy user can get COD
+
+subscription
+
+Free version
+10% for withdraw
+only 10 products permonth
+only 5 COD items permonth
+
+
+
+
+
+Events
+
+* admin crud events done
+* seller join events
+
+
+notification
+
+seller_notification
+* when admin create events
+* when admin accept product
+
+seller_email
+* when admin create events
+* when withdraw success
+* when seller account created
+* when admin accept product
+* when admin ban (optional v2)
+

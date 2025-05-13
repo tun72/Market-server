@@ -1,4 +1,4 @@
-const { Category } = require("../models/productSchema.js");
+const { Category } = require("../models/productModel.js");
 
 const getAllCategoriesController = async (_, res) => {
   const categories = await Category.find();

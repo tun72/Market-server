@@ -15,6 +15,13 @@ const brandSchema = new Schema({
     timestamps: true,
 });
 
+const typeSchema = new Schema({
+    name: { type: String, required: true, unique: true },
+    slug: { type: String, required: true, unique: true },
+    createdAt: { type: Date, default: Date.now },
+});
+
+
 const categorySchema = new Schema({
     name: {
         type: String,
@@ -24,10 +31,10 @@ const categorySchema = new Schema({
         maxlength: [100, 'Category name cannot exceed 100 characters'],
         index: true
     },
-    parent: {
+    typeId: {
         type: ObjectId,
-        ref: 'Category',
-        default: null
+        ref: 'Type',
+        require: true
     },
     isActive: {
         type: Boolean,
@@ -39,10 +46,10 @@ const categorySchema = new Schema({
     toObject: { virtuals: true }
 });
 
-categorySchema.virtual('subcategories', {
-    ref: 'Category',
+typeSchema.virtual('categories', {
+    ref: 'Type',
     localField: '_id',
-    foreignField: 'parent'
+    foreignField: 'typeId'
 });
 
 
@@ -98,12 +105,15 @@ const ProductSchema = new Schema({
     brand: {
         type: ObjectId,
         ref: 'Brand',
-        required: [true, 'Brand reference is required']
+        default: null
     },
     category: {
         type: ObjectId,
         ref: 'Category',
         required: [true, 'Category reference is required']
+    },
+    coverImage: {
+        type: String
     },
     images: [{
         type: String,
@@ -148,14 +158,25 @@ const ProductSchema = new Schema({
         title: { type: String, trim: true, maxlength: 150 },
         description: { type: String, trim: true, maxlength: 300 }
     },
-    relatedProducts: [{
-        type: ObjectId,
-        ref: 'Product'
-    }],
+    // relatedProducts: [{
+    //     type: ObjectId,
+    //     ref: 'Product'
+    // }],
     status: {
         type: String,
-        enum: ['draft', 'active', 'archived', 'discontinued'],
-        default: 'draft'
+        default: 'pending',
+        validate: {
+            validator: function (v) {
+                return ['pending', 'active', 'archived'].includes(v);
+            },
+            message: props => `${props.value} is not a valid status. Valid values are: ${['pending', 'active', 'archived'].join(', ')}`
+        }
+    },
+
+    seller: {
+        type: ObjectId,
+        ref: "Seller",
+        required: [true, 'Product must have marchant']
     }
 }, {
     timestamps: true,
@@ -190,7 +211,7 @@ const variationSchema = new Schema({
             required: true,
             uppercase: true,
             enum: ['USD', 'EUR', 'GBP', 'JPY', "MMK"],
-            default: 'USD'
+            default: 'MMK'
         },
         salePrice: {
             type: Number,
@@ -245,6 +266,7 @@ const variationSchema = new Schema({
 
 module.exports = {
     Brand: model('Brand', brandSchema),
+    Type: model("Type", typeSchema),
     Category: model('Category', categorySchema),
     Variation: model('Variation', variationSchema),
     Product: model('Product', ProductSchema),
