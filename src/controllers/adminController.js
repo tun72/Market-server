@@ -1,9 +1,12 @@
-const { Seller, Withdrawal } = require("../models/sellerModel");
+const { Withdrawal } = require("../models/paymentCategoryModel");
 const { Product } = require("../models/productModel");
 
 const factory = require("./handlerFactory");
 const catchAsync = require("../utils/catchAsync");
 const { getSocket, userSocketMap } = require("../socket");
+const { Event } = require("../models/eventsModel");
+const { Seller } = require("../models/userModel");
+
 
 // Seller
 exports.getAllSellers = factory.getAll({
@@ -64,7 +67,15 @@ exports.updateStatus = catchAsync(async (req, res, next) => {
     })
 
     return res.status(200).json({ message: "sucess" })
-
-
-
 })
+
+
+// events
+exports.createEvent = factory.createOne(Event)
+exports.getAllEvents = factory.getAll({ Model: Event })
+exports.updateEvent = factory.updateOne(Event)
+exports.deleteEvent = factory.deleteOne(Event)
+
+
+
+

@@ -1,16 +1,14 @@
 const express = require("express");
-
 const router = express.Router();
-
+const { body } = require('express-validator');
 const adminController = require("../controllers/adminController");
-
-
 // Middlewares
 const sellerMiddleware = require("../middlewares/sellerMiddleware")
+const eventMiddleware = require("../middlewares/eventMiddleware");
+const handleErrorMessage = require("../middlewares/handelErrorMessage");
 
-// get routes (businedd type)
-// router.post("/signin", authController.signIn);
-// router.post("/signup", authController.signUp);
+
+
 
 
 // seller
@@ -25,6 +23,7 @@ router.route("/sellers")
 
 
 router.get("/sellers/:id", adminController.getSellerById)
+
 router.patch("/sellers/:id",
     sellerMiddleware.isSellerExist,
     sellerMiddleware.uploadImage,
@@ -46,6 +45,33 @@ router.route("/products/:id")
     .get(adminController.getProductById)
     .put(adminController.updateProduct)
     .delete(adminController.removeProduct)
+
+
+// events
+
+router.route("/events")
+    .get(adminController.getAllEvents)
+    .post(
+        eventMiddleware.uploadImage,
+        [
+            body('name').notEmpty().withMessage('Name is required'),
+            body('type').notEmpty().withMessage('Type is required'),
+            body('startDate').toDate().notEmpty().withMessage("Start Date is required"),
+            body('endDate').toDate().notEmpty().withMessage("End Date is required"),
+        ],
+        handleErrorMessage,
+        eventMiddleware.sendEventNotification,
+        eventMiddleware.resizeImage,
+        adminController.createEvent
+    )
+
+router.route("/events/:id").put(
+    eventMiddleware.isEventExit,
+    eventMiddleware.uploadImage,
+    eventMiddleware.resizeImage,
+    eventMiddleware.updateImage,
+    adminController.updateEvent)
+    .delete(adminController.deleteEvent)
 
 
 
