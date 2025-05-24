@@ -11,7 +11,6 @@ const userSchema = new mongoose.Schema(
             type: String,
             required: [true, "Please tell us your name!"],
             trim: true,
-            maxlength: [100, "Name cannot exceed 100 characters"],
         },
         email: {
             type: String,
@@ -117,13 +116,11 @@ const customerSchema = new mongoose.Schema({
 const sellerSchema = new mongoose.Schema({
     phone: {
         type: String,
+        required: [true, "Please provide a valid international phone number"],
+    },
+    logo: {
+        type: String,
         required: true,
-        validate: {
-            validator: function (v) {
-                return /^\+?[1-9]\d{1,14}$/.test(v);
-            },
-            message: "Please provide a valid international phone number",
-        },
     },
     address: {
         street: String,
@@ -139,7 +136,6 @@ const sellerSchema = new mongoose.Schema({
     NRCNumber: {
         type: String,
         required: true,
-        unique: true,
     },
     NRCPhoto: {
         type: String,

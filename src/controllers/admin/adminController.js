@@ -1,11 +1,11 @@
-const { Withdrawal } = require("../models/paymentCategoryModel");
-const { Product } = require("../models/productModel");
+const { Withdrawal } = require("../../models/paymentCategoryModel");
+const { Product } = require("../../models/productModel");
 
-const factory = require("./handlerFactory");
-const catchAsync = require("../utils/catchAsync");
-const { getSocket, userSocketMap } = require("../socket");
-const { Event } = require("../models/eventsModel");
-const { Seller } = require("../models/userModel");
+const factory = require("../handlerFactory");
+const catchAsync = require("../../utils/catchAsync");
+const { getSocket, userSocketMap } = require("../../socket");
+const { Event } = require("../../models/eventsModel");
+const { Seller } = require("../../models/userModel");
 
 
 // Seller
@@ -29,20 +29,6 @@ exports.getAllWithDraw = factory.getAll({
 })
 
 
-// products
-exports.getAllProducts = factory.getAll({
-    Model: Product,
-    fields: ["brand", "category", "variations", "seller"]
-})
-
-exports.getProductById = factory.getOne({
-    Model: Product,
-    fields: ["brand", "category", "variations", "seller"]
-
-})
-
-exports.updateProduct = factory.updateOne(Product)
-exports.removeProduct = factory.deleteOne(Product)
 
 
 
