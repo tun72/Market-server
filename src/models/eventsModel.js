@@ -61,26 +61,27 @@ const participantSchema = new Schema({
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending'
     },
-    products: [{
-        product: {
-            type: Schema.Types.ObjectId,
-            ref: 'Product',
-            required: true
-        },
-        originalPrice: {
-            type: Number,
-            required: true
-        },
-        discount: {
-            type: Number,
-            required: true,
-            min: 0,
-            max: 100
-        },
-        startDate: Date,
-        endDate: Date
+    discountProducts: [{
+        type: Schema.Types.ObjectId,
+        ref: "Discount"
     }]
 }, { timestamps: true });
+
+
+
+
+eventSchema.pre('findOneAndDelete', async function () {
+    const doc = await this.model.findOne(this.getFilter()).lean();
+    if (!doc || !doc.poster) return;
+
+    const filePath = path.join(__dirname, '../public', doc.poster);
+    await fileDelete(filePath);
+});
+
+module.exports = {
+    Event: model('Event', eventSchema),
+    Participant: model('Participant', participantSchema),
+}
 
 
 // Pre-save hook for discount price calculation
@@ -95,34 +96,3 @@ const participantSchema = new Schema({
 
 // eventSchema.index({ status: 1, startDate: 1 });
 // participantSchema.index({ event: 1, seller: 1 });
-
-
-
-
-eventSchema.pre(/deleteOne|findOneAndDelete/, async function (next) {
-    try {
-        const doc = await this.model.findOne(this.getFilter());
-        if (!doc) return next();
-        const photoFields = ["poster"];
-        await Promise.all(
-            photoFields.map(async (field) => {
-                if (doc[field]) {
-                    const filePath = path.join(
-                        __dirname, "../", "public",
-                        doc[field]
-                    );
-                    console.log(filePath);
-                    await fileDelete(filePath)
-                }
-            })
-        );
-        next();
-    } catch (err) {
-        next(err);
-    }
-});
-
-module.exports = {
-    Event: model('Event', eventSchema),
-    Participant: model('Participant', participantSchema)
-}

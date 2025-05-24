@@ -1,14 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const { body } = require('express-validator');
-const adminController = require("../controllers/adminController");
+const adminController = require("../../../controllers/admin/adminController");
+
+const productController = require("../../../controllers/admin/productController");
+
 // Middlewares
-const sellerMiddleware = require("../middlewares/sellerMiddleware")
-const eventMiddleware = require("../middlewares/eventMiddleware");
-const handleErrorMessage = require("../middlewares/handelErrorMessage");
-
-
-
+const sellerMiddleware = require("../../../middlewares/sellerMiddleware")
+const eventMiddleware = require("../../../middlewares/eventMiddleware");
+const handleErrorMessage = require("../../../middlewares/handelErrorMessage");
 
 
 // seller
@@ -36,15 +36,15 @@ router.delete("/sellers/:id", adminController.deleteSeller)
 
 // products
 
-router.get("/products", adminController.getAllProducts)
+router.get("/products", productController.getAllProducts)
 
-router.patch("/products/update-status/:id", adminController.updateStatus)
+// router.patch("/products/update-status/:id", productController.updateStatus)
 
 
 router.route("/products/:id")
-    .get(adminController.getProductById)
-    .put(adminController.updateProduct)
-    .delete(adminController.removeProduct)
+    .get(productController.getProductById)
+    .put(productController.updateProduct)
+    .delete(productController.removeProduct)
 
 
 // events

@@ -1,4 +1,4 @@
-const { Customer } = require("../models/userModel");
+const { Customer, User } = require("../models/userModel");
 const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
 
@@ -22,11 +22,11 @@ exports.signIn = catchAsync(async (req, res, next) => {
     if (!email || !password)
         return next(new AppError("Please provide email and password", 400));
 
-    const user = await Customer.findOne({ email }).select("+password");
+    const user = await User.findOne({ email }).select("+password");
 
     if (!user || !(await user.correctPassword(password, user.password)))
         return next(new AppError("Incorrect Email or Password.", 401));
-    // send token back
+
     createSendToken({ user, res, statusCode: 200, next });
 });
 

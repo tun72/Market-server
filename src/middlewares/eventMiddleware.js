@@ -6,7 +6,7 @@ const resizeImage = require("../utils/resizeImage");
 const helper = require("../utils/helpers");
 const { Event } = require("../models/eventsModel");
 const { getSocket, userSocketMap } = require("../socket");
-const { Seller } = require("../models/userModel");
+const { User } = require("../models/userModel");
 const Notification = require("../models/notificationModel")
 
 
@@ -39,17 +39,20 @@ exports.sendEventNotification = catchAsync(async (req, res, next) => {
 
     await Promise.all(Array.from(userSocketMap.entries()).map(
         async ([userId, socketId]) => {
-            const seller = await Seller.findById(userId);
+            const seller = await User.findById(userId);
             if (!seller) return;  // skip if no seller
 
-            const notification = await Notification.create({
-                reciver: seller._id,
-                type: "event",
-                link: "events",
-                message: "New Event Alert!",
-            });
+            if (seller.role === "seller") {
+                const notification = await Notification.create({
+                    reciver: seller._id,
+                    type: "event",
+                    link: "events",
+                    message: "New Event Alert!",
+                });
 
-            io.to(socketId).emit('admin_notification', notification);
+                io.to(socketId).emit('admin_notification', notification);
+            }
+
         })
     )
 

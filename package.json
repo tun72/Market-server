@@ -7,7 +7,10 @@
     "dev": "nodemon src/server",
     "start": "node src/server",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "server": "nodemon server"
+    "server": "nodemon server",
+    "db:insert": "node ./src/dev-data/data/import-dev-data.js --import",
+    "db:delete": "node ./src/dev-data/data/import-dev-data.js --delete",
+    "work": "nodemon src/jobs/workers/ImageWorker.js"
   },
   "author": "tun72",
   "license": "ISC",
@@ -15,11 +18,14 @@
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "body-parser": "^1.20.2",
+    "bullmq": "^5.53.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "csurf": "^1.11.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-validator": "^7.2.1",
+    "ioredis": "^5.6.1",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.6.2",
     "mongoose": "^8.4.0",
@@ -29,5 +35,8 @@
     "nodemon": "^3.1.9",
     "sharp": "^0.34.1",
     "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^9.8.0"
   }
 }

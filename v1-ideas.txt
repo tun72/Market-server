@@ -32,3 +32,6 @@ seller_email
 * when admin accept product
 * when admin ban (optional v2)
 
+
+* (NEED TO FIX --- > sellerController joinEvent product.seller !=== req.user._id)
+

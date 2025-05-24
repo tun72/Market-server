@@ -4,33 +4,28 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const morgan = require("morgan");
 const globalErrorController = require("./controllers/errorController");
-const productRoute = require("./routes/productRoutes")
-const authRoute = require("./routes/authRoute");
-const adminRoute = require("./routes/adminRoute")
-const categoryRoute = require("./routes/categoryRoutes")
+const cookieParser = require("cookie-parser")
 const Admin = require("./models/adminModel");
 const path = require("path");
 const { setupSocket } = require("./socket");
 const dotenv = require("dotenv");
+const routes = require("./routes/v1/index")
 dotenv.config();
 
-
 const app = express();
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json()).use(cookieParser());
+
 app.use(cors());
 app.options("*", cors());
-app.use(express.static(path.join(__dirname, "public")));
+
 app.use(bodyParser.json());
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// routes
-app.use("/api/v1/products", productRoute);
-app.use("/api/v1/auth", authRoute);
-
-app.use("/api/v1/admin", adminRoute);
-app.use("/api/v1/categories", categoryRoute);
-
+app.use(routes)
 app.use(globalErrorController);
 
 const PORT = process.env.PORT || 3000;
