@@ -12,3 +12,7 @@ Version 2
 version 2
 validator -> admin -> create event -> date validator -> customize
 
+
+version 2
+product -> variation
+
