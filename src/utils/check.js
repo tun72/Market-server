@@ -13,4 +13,13 @@ exports.checkPhotoIfNotExistArray = (fileArr) => {
 };
 
 
+exports.checkPhotoIfNotExistFields = (file, fields) => {
+    fields.forEach((field) => {
+        if (!file[field]) {
+            throw (new AppError(`Invalid Image for ${field}`, 409))
+        }
+    });
+};
+
+
 

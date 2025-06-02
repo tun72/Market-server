@@ -8,9 +8,10 @@
     "start": "node src/server",
     "test": "echo \"Error: no test specified\" && exit 1",
     "server": "nodemon server",
-    "db:insert": "node ./src/dev-data/data/import-dev-data.js --import",
-    "db:delete": "node ./src/dev-data/data/import-dev-data.js --delete",
-    "work": "nodemon src/jobs/workers/ImageWorker.js"
+    "db:insert": "node ./dev-data/data/import-dev-data.js --import",
+    "db:delete": "node ./dev-data/data/import-dev-data.js --delete",
+    "work": "nodemon src/jobs/workers/ImageWorker.js",
+    "scrape": "node ./scrape/productScrape.js"
   },
   "author": "tun72",
   "license": "ISC",
@@ -37,6 +38,8 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "@faker-js/faker": "^9.8.0"
+    "@faker-js/faker": "^9.8.0",
+    "axios": "^1.9.0",
+    "cheerio": "^1.0.0"
   }
 }

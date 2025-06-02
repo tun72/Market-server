@@ -4,39 +4,16 @@ const { body, validationResult } = require("express-validator");
 const { checkPhotoIfNotExistArray } = require("../../utils/check");
 const { createOneProduct, updateOneProduct } = require("../../services/productServices");
 const ImageQueue = require("../../jobs/queues/ImageQueue");
-const fileDelete = require("../../utils/fileDelete");
-const path = require("path");
+
+
 const { createOrConnectCategory } = require("../../services/categoryService");
 const { getTypeByName } = require("../../services/typeService");
 const { Product } = require("../../models/productModel");
 const mongoose = require("mongoose")
-const factory = require("../handlerFactory")
+const factory = require("../handlerFactory");
+const removeImages = require("../../utils/fileDelete");
 
-async function removeImages(originalFiles, optimizeFiles) {
-    if (originalFiles && originalFiles.length > 0) {
-        for (const originalFile of originalFiles) {
-            const originalfilePath = path.join(
-                __dirname,
-                "../../..",
-                "/uploads/images",
-                originalFile
-            );
-            await fileDelete(originalfilePath)
-        }
-    }
 
-    if (optimizeFiles) {
-        for (const optimizedFile of optimizeFiles) {
-            const optimizefilePath = path.join(
-                __dirname,
-                "../../..",
-                "/uploads/optimize",
-                optimizedFile
-            );
-            await fileDelete(optimizefilePath);
-        }
-    }
-}
 
 exports.getAllProducts = [
     catchAsync(async (req, res, next) => {
@@ -276,7 +253,6 @@ exports.updateProduct = [
             brand,
             inventory,
             shipping,
-            images: [],
         }
 
 

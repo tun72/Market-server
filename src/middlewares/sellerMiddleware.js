@@ -23,7 +23,6 @@ exports.uploadImage = upload.fields(
         { name: "logo", maxCount: 1 }
     ]
 )
-
 exports.resizeImage = catchAsync(async (req, res, next) => {
     if (!req.files["nrc"]) return next();
     const directory = path.join(__dirname, "../", "../", 'public', 'img', 'sellers', 'nrc');

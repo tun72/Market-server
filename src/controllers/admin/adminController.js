@@ -5,22 +5,8 @@ const factory = require("../handlerFactory");
 const catchAsync = require("../../utils/catchAsync");
 const { getSocket, userSocketMap } = require("../../socket");
 const { Event } = require("../../models/eventsModel");
-const { Seller } = require("../../models/userModel");
 
 
-// Seller
-exports.getAllSellers = factory.getAll({
-    Model: Seller,
-});
-
-exports.getSellerById = factory.getOne({
-    Model: Seller
-})
-
-exports.createSeller = factory.createOne(Seller)
-
-exports.updateSeller = factory.updateOne(Seller)
-exports.deleteSeller = factory.deleteOne(Seller)
 
 
 // withdraw

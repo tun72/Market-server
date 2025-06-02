@@ -5,33 +5,45 @@ const adminController = require("../../../controllers/admin/adminController");
 
 const productController = require("../../../controllers/admin/productController");
 
+const sellerController = require("../../../controllers/admin/sellerController");
+
 // Middlewares
 const sellerMiddleware = require("../../../middlewares/sellerMiddleware")
 const eventMiddleware = require("../../../middlewares/eventMiddleware");
 const handleErrorMessage = require("../../../middlewares/handelErrorMessage");
+const upload = require("../../../middlewares/uploadFile");
 
 
 // seller
 
 router.route("/sellers")
-    .get(adminController.getAllSellers)
+    .get(sellerController.getAllSellers)
     .post(
-        sellerMiddleware.uploadImage,
-        sellerMiddleware.resizeImage,
-        adminController.createSeller
+        upload.fields([
+            { name: "NRCFront", maxCount: 1 },
+            { name: "NRCBack", maxCount: 1 },
+            { name: "logo", maxCount: 1 }
+        ]),
+        sellerController.createSeller
     )
 
 
-router.get("/sellers/:id", adminController.getSellerById)
+router.get("/sellers/:id", sellerController.getSellerById)
 
-router.patch("/sellers/:id",
-    sellerMiddleware.isSellerExist,
-    sellerMiddleware.uploadImage,
-    sellerMiddleware.resizeImage,
-    sellerMiddleware.updateImage,
-    adminController.updateSeller)
+router.patch("/sellers", upload.fields([
+    { name: "NRCFront", maxCount: 1 },
+    { name: "NRCBack", maxCount: 1 },
+    { name: "logo", maxCount: 1 }
+]), sellerController.updateSeller)
 
-router.delete("/sellers/:id", adminController.deleteSeller)
+// router.patch("/sellers/:id",
+//     sellerMiddleware.isSellerExist,
+//     sellerMiddleware.uploadImage,
+//     sellerMiddleware.resizeImage,
+//     sellerMiddleware.updateImage,
+//     adminController.updateSeller)
+
+// router.delete("/sellers/:id", adminController.deleteSeller)
 
 
 // products
