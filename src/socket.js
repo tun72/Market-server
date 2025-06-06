@@ -12,7 +12,6 @@ const setupSocket = (server) => {
     });
 
 
-
     const disconnect = (socket) => {
         for (const [userId, socketId] of userSocketMap.entries()) {
             if (socketId === socket.id) {
@@ -21,8 +20,6 @@ const setupSocket = (server) => {
             }
         }
     };
-
-
 
 
     io.on("connection", (socket) => {

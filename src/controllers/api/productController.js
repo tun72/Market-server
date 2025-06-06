@@ -3,8 +3,6 @@ const { Product } = require("../../models/productModel");
 
 const factory = require("../handlerFactory");
 
-
-
 // products
 exports.getAllProducts = factory.getAll({
     Model: Product,
