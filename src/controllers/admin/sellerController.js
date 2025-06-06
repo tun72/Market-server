@@ -3,7 +3,7 @@ const Seller = require("../../models/sellerModel");
 
 const factory = require("../handlerFactory");
 const catchAsync = require("../../utils/catchAsync");
-const removeImages = require("../../utils/fileDelete");
+const { removeImages } = require("../../utils/fileDelete");
 const AppError = require("../../utils/appError");
 const { checkPhotoIfNotExistArray, checkPhotoIfNotExistFields } = require("../../utils/check");
 const ImageQueue = require("../../jobs/queues/ImageQueue");

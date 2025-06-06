@@ -11,7 +11,7 @@ const { getTypeByName } = require("../../services/typeService");
 const { Product } = require("../../models/productModel");
 const mongoose = require("mongoose")
 const factory = require("../handlerFactory");
-const removeImages = require("../../utils/fileDelete");
+const { removeImages } = require("../../utils/fileDelete");
 
 
 
@@ -20,7 +20,26 @@ exports.getAllProducts = [
         // if (!req.user) {
         //     return next(new AppError("Login required", 403))
         // }
-        req.query.merchant = "6828bc48f26e66121cf78eb3"
+        // const products = await Product.find()
+        // console.log(products);
+
+
+        // const user = req.userId
+        // if (!user) {
+        //     if (req.file) {
+        //         await removeFile(req.file.filename);
+        //     }
+        //     return next(
+        //         createError(
+        //             "This account is not registered.",
+        //             401,
+        //             errorCode.unauthenticated
+        //         )
+        //     );
+        // }
+
+        // req.query.merchant = req.userId
+
         next()
     }), factory.getAll({
         Model: Product,
@@ -149,7 +168,7 @@ exports.createProduct = [
             inventory,
             shipping,
             images,
-            merchant: "6828bc48f26e66121cf78eb3" // , 6828bc48f26e66121cf78eb4
+            merchant: req.userId // , 6828bc48f26e66121cf78eb4
         }
 
         const product = await createOneProduct(data)

@@ -14,7 +14,7 @@ exports.createOrConnectTag = async (tags) => {
         )
     ));
 
-    console.log(tagIds);
+    // console.log(tagIds);
 
     return tagIds.map(tag => tag._id.toString());
 }

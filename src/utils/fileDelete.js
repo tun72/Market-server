@@ -1,8 +1,11 @@
 // this will help you delete files
 const fs = require("fs/promises");
 const path = require("path");
-const fileDelete = async (path) => {
+
+exports.fileDelete = async (path) => {
   try {
+    console.log(path);
+
     await fs.unlink(path);
   } catch (err) {
     console.log(err);
@@ -12,7 +15,7 @@ const fileDelete = async (path) => {
 };
 
 
-const removeImages = async (originalFiles, optimizeFiles, target = "/uploads/images") => {
+exports.removeImages = async (originalFiles, optimizeFiles, target = "/uploads/images") => {
   if (originalFiles && originalFiles.length > 0) {
     for (const originalFile of originalFiles) {
       const originalfilePath = path.join(
@@ -37,4 +40,4 @@ const removeImages = async (originalFiles, optimizeFiles, target = "/uploads/ima
     }
   }
 }
-module.exports = removeImages
+

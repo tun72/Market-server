@@ -1,6 +1,7 @@
 const { Schema, model } = require('mongoose');
 const path = require('path');
-const fileDelete = require('../utils/fileDelete');
+const { fileDelete } = require('../utils/fileDelete');
+
 const eventSchema = new Schema({
     name: {
         type: String,
@@ -73,8 +74,7 @@ const participantSchema = new Schema({
 eventSchema.pre('findOneAndDelete', async function () {
     const doc = await this.model.findOne(this.getFilter()).lean();
     if (!doc || !doc.poster) return;
-
-    const filePath = path.join(__dirname, '../public', doc.poster);
+    const filePath = path.join(__dirname, '../../uploads', doc.poster);
     await fileDelete(filePath);
 });
 

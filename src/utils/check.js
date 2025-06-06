@@ -5,7 +5,6 @@ exports.checkPhotoIfNotExist = (file) => {
     }
 };
 
-
 exports.checkPhotoIfNotExistArray = (fileArr) => {
     if (fileArr.length === 0) {
         throw (new AppError("Invalid Image", 409))

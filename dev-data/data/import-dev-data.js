@@ -9,6 +9,7 @@ const { Product, Type } = require("../../src/models/productModel");
 const { getTypeByName } = require("../../src/services/typeService");
 const { createOrConnectCategory } = require("../../src/services/categoryService");
 const { createOrConnectTag } = require("../../src/services/tagServices");
+const bcrypt = require("bcryptjs")
 env.config();
 
 const DATABASE_URL = process.env.MONGODB_URL;
@@ -29,6 +30,7 @@ const importData = async () => {
         const users = [];
 
 
+        const password = await bcrypt.hash("password123", 12)
 
         for (let i = 0; i < 6; i++) {
 
@@ -36,8 +38,7 @@ const importData = async () => {
                 name: faker.internet.username(),
                 email: faker.internet.email(),
                 role: "seller",
-                password: "Test123!",
-                passwordConfirm: "Test123!",
+                password,
                 businessName: faker.company.name(),
                 phone: faker.phone.number(),
                 active: 1,
@@ -49,8 +50,8 @@ const importData = async () => {
                 },
                 description: faker.lorem.paragraph(),
                 NRCNumber: faker.number.int(),
-                NRCPhotoBack: faker.image.url(),
-                NRCPhotoFront: faker.image.url(),
+                NRCBack: faker.image.url(),
+                NRCFront: faker.image.url(),
                 balance: 100,
                 rating: 5,
                 logo: faker.image.url(),
@@ -64,7 +65,7 @@ const importData = async () => {
         console.log(user_array);
 
         await Promise.all(fileNames.map(async (name, i) => {
-            console.log(name);
+            // console.log(name);
 
             const products = await readJSON(`../products/${name}.json`);
 
@@ -94,7 +95,7 @@ const importData = async () => {
 
         }))
 
-        console.log(`Successfully seeded ${users.length} users`);
+        // console.log(`Successfully seeded ${users.length} users`);
     } catch (err) {
         console.error("Error inserting data:", err);
     } finally {

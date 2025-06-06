@@ -6,6 +6,7 @@ const catchAsync = require("../../utils/catchAsync");
 const factory = require("../handlerFactory");
 
 
+
 exports.getAllEvents = factory.getAll({ Model: Event })
 exports.getEventById = factory.getOne(Event)
 // exports.joinEvent = factory.createOne(Participant)
@@ -70,4 +71,3 @@ exports.addDiscount = catchAsync(async (req, res, next) => {
 });
 
 exports.getParticipant = factory.getOne({ Model: Participant, fields: ["discountProducts"] })
-

@@ -1,7 +1,5 @@
 const mongoose = require("mongoose");
 const User = require("./userModel");
-
-
 const adminSchema = new mongoose.Schema({
     accessLevel: {
         type: Number,

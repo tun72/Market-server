@@ -1,7 +1,7 @@
 const { Schema, model } = require('mongoose');
 const { ObjectId } = Schema.Types;
 
-const isValidURL = (v) => /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/.test(v);
+// const isValidURL = (v) => /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/.test(v);
 
 const typeSchema = new Schema({
     name: { type: String, required: true, unique: true },

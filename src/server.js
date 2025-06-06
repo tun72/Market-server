@@ -11,6 +11,7 @@ const dotenv = require("dotenv");
 const routes = require("./routes/v1/index");
 const Admin = require("./models/adminModel");
 const { generateRandToken } = require("./utils/generateToken");
+
 dotenv.config();
 
 const app = express();
@@ -25,7 +26,6 @@ app.use(bodyParser.json());
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
-
 app.use(routes)
 app.use(globalErrorController);
 

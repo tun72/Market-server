@@ -1,21 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const { body } = require('express-validator');
-const adminController = require("../../../controllers/admin/adminController");
-
-const productController = require("../../../controllers/admin/productController");
-
+const eventController = require("../../../controllers/admin/eventController");
 const sellerController = require("../../../controllers/admin/sellerController");
-
-// Middlewares
-const sellerMiddleware = require("../../../middlewares/sellerMiddleware")
 const eventMiddleware = require("../../../middlewares/eventMiddleware");
 const handleErrorMessage = require("../../../middlewares/handelErrorMessage");
 const upload = require("../../../middlewares/uploadFile");
 
 
 // seller
-
 router.route("/sellers")
     .get(sellerController.getAllSellers)
     .post(
@@ -26,8 +19,6 @@ router.route("/sellers")
         ]),
         sellerController.createSeller
     )
-
-
 router.get("/sellers/:id", sellerController.getSellerById)
 
 router.patch("/sellers", upload.fields([
@@ -35,34 +26,12 @@ router.patch("/sellers", upload.fields([
     { name: "NRCBack", maxCount: 1 },
     { name: "logo", maxCount: 1 }
 ]), sellerController.updateSeller)
-
-// router.patch("/sellers/:id",
-//     sellerMiddleware.isSellerExist,
-//     sellerMiddleware.uploadImage,
-//     sellerMiddleware.resizeImage,
-//     sellerMiddleware.updateImage,
-//     adminController.updateSeller)
-
-// router.delete("/sellers/:id", adminController.deleteSeller)
-
-
-// products
-
-router.get("/products", productController.getAllProducts)
-
-// router.patch("/products/update-status/:id", productController.updateStatus)
-
-
-router.route("/products/:id")
-    .get(productController.getProductById)
-    .put(productController.updateProduct)
-    .delete(productController.removeProduct)
+// router.delete("/sellers/:id", sellerController.deleteSeller)
 
 
 // events
-
 router.route("/events")
-    .get(adminController.getAllEvents)
+    .get(eventController.getAllEvents)
     .post(
         eventMiddleware.uploadImage,
         [
@@ -74,7 +43,7 @@ router.route("/events")
         handleErrorMessage,
         eventMiddleware.sendEventNotification,
         eventMiddleware.resizeImage,
-        adminController.createEvent
+        eventController.createEvent
     )
 
 router.route("/events/:id").put(
@@ -82,8 +51,8 @@ router.route("/events/:id").put(
     eventMiddleware.uploadImage,
     eventMiddleware.resizeImage,
     eventMiddleware.updateImage,
-    adminController.updateEvent)
-    .delete(adminController.deleteEvent)
+    eventController.updateEvent)
+    .delete(eventController.deleteEvent)
 
 
 

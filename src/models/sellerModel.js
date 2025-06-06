@@ -81,13 +81,6 @@ sellerSchema.pre(/deleteOne|findOneAndDelete/, async function (next) {
     }
 });
 
-// sellerSchema.pre("save", async function (next) {
-//     if (!this.isModified("password")) return next();
-//     this.password = bcrypt.hash(this.password, 12);
-//     this.passwordConfirm = undefined;
-//     next();
-// });
-
 const Seller = User.discriminator("seller", sellerSchema);
 
 module.exports = Seller
