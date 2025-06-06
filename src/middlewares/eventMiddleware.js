@@ -1,5 +1,5 @@
 const catchAsync = require("../utils/catchAsync");
-const upload = require("../utils/upload");
+const upload = require("../utils/uploadMemory");
 const fs = require("fs/promises")
 const path = require("node:path");
 const resizeImage = require("../utils/resizeImage");
@@ -22,11 +22,11 @@ exports.uploadImage = upload.fields(
 
 exports.resizeImage = catchAsync(async (req, res, next) => {
     if (!req.files.poster) return next();
-    const directory = path.join(__dirname, "../", "../", 'public', 'img', 'events', 'poster');
+    const directory = path.join(__dirname, "../", "../", 'uploads', 'events', 'poster');
     await fs.mkdir(directory, { recursive: true });
     const name = `poster-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpeg`
     await resizeImage(directory + "/" + name, 1200, 628, req.files.poster[0].buffer)
-    req.body.poster = `img/events/poster/${name}`
+    req.body.poster = `events/poster/${name}`
     next()
 })
 

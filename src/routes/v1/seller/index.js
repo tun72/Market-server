@@ -1,31 +1,21 @@
 const express = require("express");
 const router = express.Router();
-const sellerController = require("../../../controllers/seller/sellerController");
-const authMiddleware = require("../../../middlewares/authMiddleware");
-
+const eventController = require("../../../controllers/seller/eventController");
 const productController = require("../../../controllers/seller/productController");
 const upload = require("../../../middlewares/uploadFile");
 
+
 // const upload = require("../utils/upload");
 
-// router.use(authMiddleware)
-
-router.get("/events", sellerController.getAllEvents)
-
-router.post("/events/join", sellerController.joinEvent)
-router.post("/events/discount-produects", sellerController.addDiscount)
-
-router.get("/events/:id", sellerController.getEventById)
-
-router.get("/participants/:id", sellerController.getParticipant)
+// events
+router.get("/events", eventController.getAllEvents)
+router.post("/events/join", eventController.joinEvent)
+router.post("/events/discount-produects", eventController.addDiscount)
+router.get("/events/:id", eventController.getEventById)
+router.get("/participants/:id", eventController.getParticipant)
 
 
-
-
-// product
-// router.route("/products")
-//     .get(productController.getAllProducts)
-
+// products
 router.get("/products", productController.getAllProducts)
 router.post("/products", upload.array("images"), productController.createProduct)
 router.patch("/products", upload.array("images"), productController.updateProduct)
