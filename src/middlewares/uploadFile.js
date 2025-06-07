@@ -34,18 +34,6 @@ const upload = multer({ storage: fileStorage, fileFilter: fileFilterConfig, limi
 module.exports = upload
 
 
-// memory
-const fileFilterConfig_mermory = (req, file, cb) => {
-    const mimtypes = ["image/png", "image/jpg", "image/jpeg"]
-    if (mimtypes.includes(file.mimetype)) {
-        cb(null, true)
-    } else {
-        cb(null, false)
-    }
-}
-
-exports.uploadMemo = multer({ storage: multer.memoryStorage(), fileFilter: fileFilterConfig_mermory })
-
 
 
 
