@@ -29,6 +29,12 @@ const importData = async () => {
     try {
         const users = [];
 
+        const types = [{
+            name: "Grocery"
+        }]
+
+        await Type.insertMany(types)
+
 
         const password = await bcrypt.hash("password123", 12)
 
@@ -62,7 +68,7 @@ const importData = async () => {
         }
 
         const user_array = await Seller.insertMany(users);
-        console.log(user_array);
+        // console.log(user_array);
 
         await Promise.all(fileNames.map(async (name, i) => {
             // console.log(name);
@@ -108,6 +114,7 @@ const deleteData = async () => {
     try {
         await Seller.deleteMany()
         await Product.deleteMany();
+        await Type.deleteMany()
         console.log("Data successfully deleted!");
     } catch (err) {
         console.log(err);
