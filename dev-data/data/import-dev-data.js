@@ -5,11 +5,12 @@ const fs = require("node:fs/promises")
 const path = require("node:path")
 const env = require("dotenv");
 const { generateRandToken } = require("../../src/utils/generateToken");
-const { Product, Type } = require("../../src/models/productModel");
+const { Product, Type, Category } = require("../../src/models/productModel");
 const { getTypeByName } = require("../../src/services/typeService");
 const { createOrConnectCategory } = require("../../src/services/categoryService");
 const { createOrConnectTag } = require("../../src/services/tagServices");
-const bcrypt = require("bcryptjs")
+const bcrypt = require("bcryptjs");
+const User = require("../../src/models/userModel");
 env.config();
 
 const DATABASE_URL = process.env.MONGODB_URL;
@@ -29,12 +30,84 @@ const importData = async () => {
     try {
         const users = [];
 
-        const types = [{
-            name: "Grocery"
-        }]
+        const types = [
+            {
+                name: "Grocery",
+                image: "https://thumbs.dreamstime.com/b/vegetables-shopping-cart-trolley-grocery-logo-icon-design-vector-171090350.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Rice",
+                image: "https://www.myanmar-rice.com/images/ayeyarwaddy-rice.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Beans",
+                image: "https://www.myanmarpulse.com/images/ayeyarwaddy-beans.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Sesame",
+                image: "https://www.myanmarsesame.com/images/ayeyarwaddy-sesame.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Fish",
+                image: "https://www.myanmarfishery.com/images/ayeyarwaddy-fish.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Prawn",
+                image: "https://www.myanmarfishery.com/images/ayeyarwaddy-prawn.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Crab",
+                image: "https://www.myanmarfishery.com/images/ayeyarwaddy-crab.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Watermelon",
+                image: "https://www.myanmarfruit.com/images/ayeyarwaddy-watermelon.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Banana",
+                image: "https://www.myanmarfruit.com/images/ayeyarwaddy-banana.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Coconut",
+                image: "https://www.myanmarfruit.com/images/ayeyarwaddy-coconut.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Mango",
+                image: "https://www.myanmarfruit.com/images/ayeyarwaddy-mango.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Jaggery",
+                image: "https://www.myanmarsugar.com/images/ayeyarwaddy-jaggery.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Palm Oil",
+                image: "https://www.myanmarpalmoil.com/images/ayeyarwaddy-palmoil.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Salt",
+                image: "https://www.myanmarsalt.com/images/ayeyarwaddy-salt.jpg"
+            },
+            {
+                name: "Ayeyarwaddy Duck Egg",
+                image: "https://www.myanmaregg.com/images/ayeyarwaddy-duckegg.jpg"
+            }
+        ];
 
         await Type.insertMany(types)
 
+        const category = []
+        for (const type of types) {
+            for (let j = 0; j < 2; j++) {
+                const cat = {
+                    name: faker.commerce.department() + " " + faker.word.noun(),
+                    description: faker.commerce.productDescription(),
+                    image: faker.image.url(),
+                    type: (await getTypeByName(type.name))._id
+                };
+                category.push(cat);
+            }
+        }
+        await Category.insertMany(category);
 
         const password = await bcrypt.hash("password123", 12)
 
@@ -89,7 +162,7 @@ const importData = async () => {
                 product.description = "This is a local product of Myanmar (Ayeyarwaddy Region). It is a high-quality product that is grown and harvested with care. The product is known for its freshness and taste, making it a popular choice among consumers.";
                 product.status = "active";
                 product.shipping = 1000;
-                product.inventory = 100;
+                product.inventory = 30;
                 product.price = parseFloat(product.price.replace(",", ""));
 
                 product.category = category._id.toString();
@@ -112,9 +185,10 @@ const importData = async () => {
 // DELETE ALL DATA FROM DB
 const deleteData = async () => {
     try {
-        await Seller.deleteMany()
+        await User.deleteMany()
         await Product.deleteMany();
         await Type.deleteMany()
+        await Category.deleteMany()
         console.log("Data successfully deleted!");
     } catch (err) {
         console.log(err);

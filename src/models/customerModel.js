@@ -18,23 +18,6 @@ const customerSchema = new mongoose.Schema({
             },
         },
     ],
-    cart: [
-        {
-            product: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "Product",
-            },
-            quantity: {
-                type: Number,
-                default: 1,
-                min: [1, "Quantity can't be less than 1"],
-            },
-            addedAt: {
-                type: Date,
-                default: Date.now,
-            },
-        },
-    ],
     paymentMethods: [
         {
             cardType: String,

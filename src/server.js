@@ -5,7 +5,6 @@ const cors = require("cors");
 const morgan = require("morgan");
 const globalErrorController = require("./controllers/errorController");
 const cookieParser = require("cookie-parser")
-const path = require("path");
 const { setupSocket } = require("./socket");
 const dotenv = require("dotenv");
 const routes = require("./routes/v1/index");
@@ -20,7 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json()).use(cookieParser());
 
 app.use(cors());
-app.options("*", cors());
+// app.options("*", cors());
 
 app.use(bodyParser.json());
 if (process.env.NODE_ENV === "development") {

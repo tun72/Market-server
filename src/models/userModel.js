@@ -40,7 +40,8 @@ const userSchema = new mongoose.Schema(
         },
         randToken: {
             type: String,
-            required: true
+            required: true,
+            select: false,
         },
         status: {
             type: String,
