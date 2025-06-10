@@ -5,6 +5,7 @@ const { ObjectId } = Schema.Types;
 
 const typeSchema = new Schema({
     name: { type: String, required: true, unique: true },
+    image: { type: String, required: true }
 });
 
 

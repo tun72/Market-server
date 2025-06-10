@@ -11,6 +11,7 @@
     "db:insert": "node ./dev-data/data/import-dev-data.js --import",
     "db:delete": "node ./dev-data/data/import-dev-data.js --delete",
     "work": "nodemon src/jobs/workers/ImageWorker.js",
+    "order": "nodemon src/jobs/workers/OrderWorker.js",
     "scrape": "node ./scrape/productScrape.js"
   },
   "author": "tun72",
@@ -35,11 +36,13 @@
     "node-cron": "^3.0.3",
     "nodemon": "^3.1.9",
     "sharp": "^0.34.1",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "stripe": "^18.2.1"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.8.0",
     "axios": "^1.9.0",
-    "cheerio": "^1.0.0"
+    "cheerio": "^1.0.0",
+    "jest": "^29.7.0"
   }
 }

@@ -28,15 +28,21 @@ const createSendToken = async ({ user, res, statusCode, next }) => {
         })
         .status(statusCode)
         .json({
+            isSuccess: true,
             message: statusCode === 201 ? "User account successfully created" : "Login Success",
+            token: accessToken,
             data: {
-                userId: user.id,
-                accessToken,
-                refreshToken
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role
+                }
             },
         });
 };
 
+// user role
 exports.signIn = [
     body("email", "Invalid Email").trim("").isEmail().notEmpty(),
     body("password").trim("")

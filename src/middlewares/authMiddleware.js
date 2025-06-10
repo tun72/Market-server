@@ -1,10 +1,11 @@
 const jwt = require("jsonwebtoken");
 const { promisify } = require("util")
-
+const dotenv = require("dotenv");
 const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
 const User = require("../models/userModel");
 const { generateAccessToken, generateRefreshToken } = require("../utils/generateToken");
+dotenv.config()
 
 const authMiddleware = catchAsync(async (req, res, next) => {
     let accessToken;
@@ -14,6 +15,8 @@ const authMiddleware = catchAsync(async (req, res, next) => {
     ) {
         accessToken = req.headers.authorization.split(" ")[1];
     }
+    // console.log(accessToken);
+
 
     const refreshToken = req.cookies ? req.cookies.refreshToken : null;
 
@@ -27,7 +30,7 @@ const authMiddleware = catchAsync(async (req, res, next) => {
         try {
             const decoded = await promisify(jwt.verify)(refreshToken, process.env.SECRET_KEY);
 
-            const user = await User.findById(decoded.id)
+            const user = await User.findById(decoded.id).select("+randToken")
 
             if (!user) {
                 return next(new AppError("You are not an authenticated user."), 401)
@@ -38,9 +41,8 @@ const authMiddleware = catchAsync(async (req, res, next) => {
             }
 
             if (user.randToken !== refreshToken) {
-                return next(new AppError("You are not an authenticated user."), 401)
+                return next(new AppError("You are not an authenticated user.", 401))
             }
-
 
             const accessToken_new = await generateAccessToken({ id: user.id });
             const refreshToken_new = await generateRefreshToken({ id: user.id, email: user.email });

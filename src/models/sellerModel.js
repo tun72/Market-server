@@ -31,14 +31,18 @@ const sellerSchema = new mongoose.Schema({
     NRCNumber: {
         type: String,
         required: true,
+        select: false,
     },
     NRCFront: {
         type: String,
         required: true,
+        select: false,
+
     },
     NRCBack: {
         type: String,
         required: true,
+        select: false,
     },
     balance: {
         type: Number,
@@ -51,8 +55,18 @@ const sellerSchema = new mongoose.Schema({
         max: 5,
         default: 0,
     },
+}, {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
+
+sellerSchema.virtual("products", {
+    ref: "Product",
+    localField: "_id",
+    foreignField: "merchant",
+    justOne: false
+});
 
 sellerSchema.virtual('address.full').get(function () {
     return `${this.address.street}, ${this.address.city}, ${this.address.state}`;
