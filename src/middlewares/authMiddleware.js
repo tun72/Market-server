@@ -26,7 +26,10 @@ const authMiddleware = catchAsync(async (req, res, next) => {
         );
     }
 
-    const generateNewToken = async () => {
+    console.log(refreshToken);
+
+
+    async function generateNewToken() {
         try {
             const decoded = await promisify(jwt.verify)(refreshToken, process.env.SECRET_KEY);
 
@@ -71,7 +74,9 @@ const authMiddleware = catchAsync(async (req, res, next) => {
     }
 
     if (!accessToken) {
-        generateNewToken()
+        console.log("not access");
+
+        // generateNewToken()
     } else {
         try {
             const decoded = await promisify(jwt.verify)(accessToken, process.env.SECRET_KEY);
@@ -79,6 +84,8 @@ const authMiddleware = catchAsync(async (req, res, next) => {
             next()
 
         } catch (error) {
+            console.log(error);
+
             if (error.name === "TokenExpiredError") {
                 generateNewToken()
             } else {

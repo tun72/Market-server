@@ -18,10 +18,24 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()).use(cookieParser());
 
-app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true
-}));
+whitelist = []
+const corsOptions = {
+  origin: function (
+    origin,
+    callback
+  ) {
+    if (!origin) return callback(null, true);
+    if (whitelist.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+};
+
+
+app.use(cors(corsOptions));
 
 
 // app.options("*", cors());
