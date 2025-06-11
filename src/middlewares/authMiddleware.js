@@ -15,7 +15,7 @@ const authMiddleware = catchAsync(async (req, res, next) => {
     ) {
         accessToken = req.headers.authorization.split(" ")[1];
     }
-    // console.log(accessToken);
+    console.log(accessToken);
 
 
     const refreshToken = req.cookies ? req.cookies.refreshToken : null;
