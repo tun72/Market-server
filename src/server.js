@@ -18,7 +18,7 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()).use(cookieParser());
 
-whitelist = []
+let whitelist = ["http://localhost:5173"]
 const corsOptions = {
   origin: function (
     origin,
@@ -36,7 +36,6 @@ const corsOptions = {
 
 
 app.use(cors(corsOptions));
-
 
 // app.options("*", cors());
 

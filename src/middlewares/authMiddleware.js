@@ -18,18 +18,18 @@ const authMiddleware = catchAsync(async (req, res, next) => {
     console.log(accessToken);
 
 
-    const refreshToken = req.cookies ? req.cookies.refreshToken : null;
-
-    if (!refreshToken) {
-        return next(
-            new AppError("You are not authenticated user! Please log in to get access.", 401)
-        );
-    }
 
     console.log(refreshToken);
 
 
     async function generateNewToken() {
+        const refreshToken = req.cookies ? req.cookies.refreshToken : null;
+
+        if (!refreshToken) {
+            return next(
+                new AppError("You are not authenticated user! Please log in to get access.", 401)
+            );
+        }
         try {
             const decoded = await promisify(jwt.verify)(refreshToken, process.env.SECRET_KEY);
 
@@ -74,8 +74,8 @@ const authMiddleware = catchAsync(async (req, res, next) => {
     }
 
     if (!accessToken) {
-        console.log("not access");
-
+        // console.log("not access");
+        // open when frontend is on server
         // generateNewToken()
     } else {
         try {
@@ -87,7 +87,8 @@ const authMiddleware = catchAsync(async (req, res, next) => {
             console.log(error);
 
             if (error.name === "TokenExpiredError") {
-                generateNewToken()
+                // open when frontend is on server
+                // generateNewToken()
             } else {
                 return next(new AppError("Access Token is Invalid.", 400));
             }
