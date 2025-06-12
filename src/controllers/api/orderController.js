@@ -270,10 +270,10 @@ exports.createCheckoutSession = [
                 products: JSON.stringify(
                     products.map((p, i) => ({
                         id: p._id,
-                        merchant: p.merchant,
-                        quantity: orders[i].quantity,
-                        price: p.price,
-                        shipping: p.shipping,
+                        // merchant: p.merchant,
+                        // quantity: orders[i].quantity,
+                        // price: p.price,
+                        // shipping: p.shipping,
                     }))
                 ),
                 totalShipping: totalShipping,
@@ -314,7 +314,7 @@ exports.checkoutSuccess = [
             return next(new AppError("Session not found!", 400))
         }
 
-        const products = JSON.parse(session.metadata.products);
+        const productIds = JSON.parse(session.metadata.products);
         const orderCode = session.metadata.orderCode;
         const totalAmount = session.metadata.totalAmount;
 
@@ -346,6 +346,8 @@ exports.checkoutSuccess = [
         //         update: { $inc: { inventory: -product.quantity } }
         //     }
         // }));
+
+        const products = await Product.find({ _id: { $in: productIds } }).lean();
 
         if (products && products.length > 0) {
             // Use bulkWrite for efficient, atomic updates to handle high concurrency
