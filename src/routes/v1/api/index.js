@@ -56,7 +56,7 @@ router.post("/checkout-success", orderController.checkoutSuccess);
 router.get("/orders", orderController.getOrders)
 
 
-
+router.get("/orders/:code", orderController.getOrderByCode)
 
 
 module.exports = router

@@ -11,6 +11,7 @@ const { createOrConnectCategory } = require("../../src/services/categoryService"
 const { createOrConnectTag } = require("../../src/services/tagServices");
 const bcrypt = require("bcryptjs");
 const User = require("../../src/models/userModel");
+const orderModel = require("../../src/models/orderModel");
 env.config();
 
 const DATABASE_URL = process.env.MONGODB_URL;
@@ -189,6 +190,7 @@ const deleteData = async () => {
         await Product.deleteMany();
         await Type.deleteMany()
         await Category.deleteMany()
+        await orderModel.deleteMany()
         console.log("Data successfully deleted!");
     } catch (err) {
         console.log(err);
