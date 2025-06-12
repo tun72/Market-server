@@ -6,9 +6,8 @@ const AppError = require("../utils/appError");
 const authorise = (permission, ...roles) =>
     async (req, res, next) => {
         const userId = req.userId;
-        const user = await User.findById(userId);
 
-        console.log(user.role);
+        const user = await User.findById(userId);
 
         if (!user) {
             return next(new AppError("Your Account is no register!", 401));

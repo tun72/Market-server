@@ -3,7 +3,8 @@ const Customer = require("../models/customerModel");
 const User = require("../models/userModel");
 const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
-
+const dotenv = require("dotenv");
+dotenv.config()
 const { generateAccessToken, generateRefreshToken, generateRandToken } = require("../utils/generateToken");
 
 const createSendToken = async ({ user, res, statusCode, next }) => {
@@ -12,7 +13,9 @@ const createSendToken = async ({ user, res, statusCode, next }) => {
     const accessToken = await generateAccessToken({ id: user.id });
     const refreshToken = await generateRefreshToken({ id: user.id, email: user.email });
 
+
     await User.findByIdAndUpdate(user._id, { randToken: refreshToken });
+
     res
         .cookie("accessToken", accessToken, {
             httpOnly: true,

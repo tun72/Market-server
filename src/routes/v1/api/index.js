@@ -53,6 +53,8 @@ router.post("/order", orderController.createOrder)
 router.post("/create-checkout-session", orderController.createCheckoutSession);
 router.post("/checkout-success", orderController.checkoutSuccess);
 
+router.get("/orders", orderController.getOrders)
+
 
 
 
