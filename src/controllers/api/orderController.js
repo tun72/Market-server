@@ -302,6 +302,9 @@ exports.checkoutSuccess = [
             return next(new AppError(errors[0].msg, 400));
         }
 
+        console.log("hit");
+
+
         const { sessionId } = req.body;
 
         const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -314,7 +317,9 @@ exports.checkoutSuccess = [
             return next(new AppError("Session not found!", 400))
         }
 
-        const productIds = JSON.parse(session.metadata.products);
+        let productIds = JSON.parse(session.metadata.products);
+
+        productIds = productIds.map((product) => ({ _id: product.id }))
         const orderCode = session.metadata.orderCode;
         const totalAmount = session.metadata.totalAmount;
 
@@ -346,6 +351,8 @@ exports.checkoutSuccess = [
         //         update: { $inc: { inventory: -product.quantity } }
         //     }
         // }));
+
+
 
         const products = await Product.find({ _id: { $in: productIds } }).lean();
 
