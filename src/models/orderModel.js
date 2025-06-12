@@ -48,6 +48,7 @@ const orderSchema = new Schema({
         default: false,
     },
 }, {
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });

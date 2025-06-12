@@ -22,21 +22,58 @@ const calcTotalPrice = async (products) => {
     const productIds = products.map(p => p.id);
     const foundProducts = await Product.find({ _id: { $in: productIds } }).lean();
 
-
-
     foundProducts.forEach((product, index) => {
 
         const amount = Math.round(product.price * 100);
         const shippingFee = product.shipping ? Math.round(product.shipping * 100) : 0;
         // const discount = product.discount ? product.discount * quantity : 0; // assuming discount is per item
 
-        total += (amount + shippingFee) * products[index].quantity;;
+        total += (amount + shippingFee) * products[index].quantity;
         // totalDiscount += discount;
     });
 
     return { total: total / 100 };
 };
+// Optimized getOrderByCode for high concurrency and large datasets
+exports.getOrderByCode = catchAsync(async (req, res, next) => {
+    const userId = req.userId;
+    // Only select _id for existence check, avoid fetching full user doc
+    const userExists = await User.exists({ _id: userId });
+    if (!userExists) {
+        return next(new AppError("User not found.", 404));
+    }
 
+    // Use lean() for lightweight docs, and aggregate for efficient calculation
+    const orders = await Order.find({ code: req.params.code, userId })
+        .populate({ path: "productId", select: "price shipping name images" })
+        .lean();
+
+    if (!orders.length) {
+        return res.status(404).json({ status: "fail", message: "Order not found", isSuccess: false });
+    }
+
+    let totalAmount = 0;
+    const ordersWithAmount = orders.map(order => {
+        let total = 0;
+        if (order.productId && order.productId.price) {
+            const amount = Math.round(order.productId.price * 100);
+            const shippingFee = (order.productId.shipping * 100)
+            total = [(amount + shippingFee) * order.quantity] / 100;
+            totalAmount += total;
+        }
+        return {
+            ...order,
+            total
+        };
+    });
+
+    res.status(200).json({
+        status: "success",
+        order: ordersWithAmount,
+        amount: totalAmount,
+        isSuccess: true,
+    });
+});
 
 exports.getOrders = catchAsync(async (req, res, next) => {
     const userId = req.userId
@@ -45,23 +82,41 @@ exports.getOrders = catchAsync(async (req, res, next) => {
         return next(new AppError("User not found.", 404))
     }
 
-    const feature = new ApiFeature(Order.find({ userId: user._id }), req.query)
-        .filter()
-        .sort()
-        .paginate()
-        .limits()
+    const orderCodes = await Order.distinct("code", { userId: user._id });
 
-    let orders = await feature.query;
+    const page = req.query.page * 1 || 1;
+    const limit = req.query.limit * 1 || 100;
+    const skip = (page - 1) * limit;
 
-    console.log(orders);
+    const orderStats = await Order.aggregate([
+        { $match: { userId: user._id } },
+        {
+            $group: {
+                _id: "$code",
+                orderLists: { $sum: 1 },
+                status: { $first: "$status" },
+                createdAt: { $first: "$createdAt" },
+                isDelivered: { $first: "$isDelivered" }
+            }
+        },
+        {
+            $project: {
+                code: "$_id",
+                orderLists: 1,
+                status: 1,
+                createdAt: 1,
+                _id: 0
+            }
+        }
+    ]).skip(skip).limit(limit)
+
 
     res.status(200).json({
         status: "success",
-        orders,
-        isSuccess: true
+        orders: orderStats,
+        isSuccess: true,
+        total: orderCodes.length
     });
-
-
 
 
 })
