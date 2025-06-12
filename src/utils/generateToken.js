@@ -5,7 +5,7 @@ env.config();
 
 exports.generateAccessToken = async ({ id }) =>
   jwt.sign({ id }, process.env.SECRET_KEY, {
-    expiresIn: "15m",
+    expiresIn: "1d",
   });
 
 exports.generateRefreshToken = async ({ id, email }) =>

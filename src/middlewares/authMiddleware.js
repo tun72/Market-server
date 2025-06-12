@@ -15,12 +15,6 @@ const authMiddleware = catchAsync(async (req, res, next) => {
     ) {
         accessToken = req.headers.authorization.split(" ")[1];
     }
-    console.log(accessToken);
-
-
-
-    console.log(refreshToken);
-
 
     async function generateNewToken() {
         const refreshToken = req.cookies ? req.cookies.refreshToken : null;
@@ -77,9 +71,12 @@ const authMiddleware = catchAsync(async (req, res, next) => {
         // console.log("not access");
         // open when frontend is on server
         // generateNewToken()
+        return next(new AppError("Access Token is Invalid.", 401));
     } else {
         try {
             const decoded = await promisify(jwt.verify)(accessToken, process.env.SECRET_KEY);
+
+
             req.userId = decoded.id;
             next()
 
@@ -89,8 +86,9 @@ const authMiddleware = catchAsync(async (req, res, next) => {
             if (error.name === "TokenExpiredError") {
                 // open when frontend is on server
                 // generateNewToken()
+                return next(new AppError("Access Tokeni is expired.", 401));
             } else {
-                return next(new AppError("Access Token is Invalid.", 400));
+                return next(new AppError("Access Token is Invalid.", 401));
             }
         }
     }

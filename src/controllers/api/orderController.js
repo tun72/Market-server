@@ -10,7 +10,8 @@ const stripe = require("../../libs/stripe");
 const dotenv = require("dotenv");
 const Seller = require("../../models/sellerModel");
 const orderQueue = require("../../jobs/queues/OrderQueue");
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
+const ApiFeature = require("../../utils/apiFeatures");
 dotenv.config()
 
 // Calculate total price including shipping and discount
@@ -36,6 +37,34 @@ const calcTotalPrice = async (products) => {
     return { total: total / 100 };
 };
 
+
+exports.getOrders = catchAsync(async (req, res, next) => {
+    const userId = req.userId
+    const user = await User.findById(userId)
+    if (!user) {
+        return next(new AppError("User not found.", 404))
+    }
+
+    const feature = new ApiFeature(Order.find({ userId: user._id }), req.query)
+        .filter()
+        .sort()
+        .paginate()
+        .limits()
+
+    let orders = await feature.query;
+
+    console.log(orders);
+
+    res.status(200).json({
+        status: "success",
+        orders,
+        isSuccess: true
+    });
+
+
+
+
+})
 // cancel order if isn't still checkout within 5 mins
 exports.createOrder = [
     body("products", "Invalid Product Id").notEmpty(),
@@ -52,10 +81,27 @@ exports.createOrder = [
 
         const { products: productsString } = req.body;
 
-        const products = productsString.split("#").map(id => {
+        let products = productsString.split("#").map(id => {
             const [quantity, productId] = id.split("_");
             return { id: productId, quantity: Number(quantity) };
         });
+
+        if (products && !products.length > 0) {
+            return next(new AppError("Please add products id and quantity", 400))
+        }
+
+        // // Merge duplicate products by summing their quantities
+        const productMap = {};
+        products.forEach(({ id, quantity }) => {
+            if (productMap[id]) {
+                productMap[id] += quantity;
+            } else {
+                productMap[id] = quantity;
+            }
+        });
+        products = Object.entries(productMap).map(([id, quantity]) => ({ id, quantity }));
+
+
 
         const productIds = products.map(p => p.id);
 
@@ -209,8 +255,8 @@ exports.createCheckoutSession = [
             payment_method_types: ["card"],
             line_items: lineItems,
             mode: "payment",
-            success_url: `http://localhost:3000/purchase-success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `http://localhost:3000/purchase-cancel`,
+            success_url: `${process.env.FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.FRONTEND_URL}/payment-cancel`,
             // discounts: coupon
             //     ? [
             //         {
@@ -338,3 +384,10 @@ exports.checkoutSuccess = [
     }),
 ];
 
+
+
+// I currently live in the campus hostel.
+
+// Is it true that software engineering jobs in New York have a really high pay rate?
+
+// What should I continue learning?
