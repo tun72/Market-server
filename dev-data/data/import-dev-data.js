@@ -168,6 +168,7 @@ const importData = async () => {
                 product.price = 10000;
                 product.category = category._id.toString();
                 product.type = type._id.toString();
+                product.isFeatured = Math.random() < 0.5;
 
 
                 console.log(product);

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Receipt</title>
+    <style>
+      body {
+        font-family: "Courier New", Courier, monospace;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 20px;
+      }
+      .receipt-container {
+        max-width: 420px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        padding: 20px;
+        border: 1px dashed #ccc;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+      }
+      .receipt-header {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .receipt-header h1 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 1px;
+      }
+      .receipt-header p {
+        margin: 4px 0;
+        font-size: 12px;
+        color: #666;
+      }
+      .line {
+        border-top: 1px dashed #999;
+        margin: 16px 0;
+      }
+      .receipt-body {
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .item-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .total {
+        font-weight: bold;
+        font-size: 16px;
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+      }
+      .receipt-footer {
+        text-align: center;
+        font-size: 12px;
+        color: #999;
+        margin-top: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="receipt-container">
+      <div class="receipt-header">
+        <h1>YOUR COMPANY NAME</h1>
+        <p>123 Market Street, City, Country</p>
+        <p>Email: support@example.com</p>
+        <p>Date: {{date}}</p>
+      </div>
+      <div class="line"></div>
+      <div class="receipt-body">
+        <div class="item-row">
+          <span>Transaction ID:</span>
+          <span>{{transcation_id}}</span>
+        </div>
+        <div class="item-row">
+          <span>Item(s):</span>
+          <span>{{item_count}}</span>
+        </div>
+        <div class="item-row">
+          <span>Payment Method:</span>
+          <span>{{payment_method}}</span>
+        </div>
+        <div class="item-row">
+          <span>Status:</span>
+          <span>PAID</span>
+        </div>
+        <div class="line"></div>
+        <div class="total">
+          <span>Total:</span>
+          <span>{{total_amount}}</span>
+        </div>
+      </div>
+      <div class="line"></div>
+      <div class="receipt-footer">
+        Thank you for your purchase!<br />
+        No returns after 30 days.
+      </div>
+    </div>
+  </body>
+</html>
