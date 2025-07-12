@@ -12,5 +12,6 @@ exports.getAllMerchants = factory.getAll({
 exports.getMerchantById = factory.getOne({
     Model: Seller,
     // fields: ["brand", "category", "tags", "merchant", "type"]
-
 })
+
+

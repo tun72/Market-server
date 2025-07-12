@@ -20,7 +20,7 @@ const orderWorker = new Worker('order-expiration', async job => {
 
     try {
         // Find all pending orders with the given code
-        const orders = await Order.find({ code, status: 'pending' });
+        const orders = await Order.find({ code, isPaid: false });
         if (orders.length === 0) {
             return
         }

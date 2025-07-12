@@ -22,7 +22,7 @@ mongoose
     })
     .catch((err) => console.log(err));
 
-const fileNames = ["rice"]
+const fileNames = ["drink", "rice"]
 
 const readJSON = async (file) =>
     JSON.parse(await fs.readFile(path.join(__dirname, file), "utf-8"));
@@ -37,11 +37,11 @@ const importData = async () => {
                 image: "https://thumbs.dreamstime.com/b/vegetables-shopping-cart-trolley-grocery-logo-icon-design-vector-171090350.jpg"
             },
             {
-                name: "Ayeyarwaddy Rice",
+                name: "Foods",
                 image: "https://www.myanmar-rice.com/images/ayeyarwaddy-rice.jpg"
             },
             {
-                name: "Ayeyarwaddy Beans",
+                name: "Drinks",
                 image: "https://www.myanmarpulse.com/images/ayeyarwaddy-beans.jpg"
             },
             {
@@ -112,7 +112,7 @@ const importData = async () => {
 
         const password = await bcrypt.hash("password123", 12)
 
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 20; i++) {
 
             const userData = {
                 name: faker.internet.username(),
@@ -157,19 +157,28 @@ const importData = async () => {
                 }
 
                 const category = await createOrConnectCategory(product.category, type._id)
+                product.name = product.name.slice(0, 120)
                 product.tags = await createOrConnectTag([type.name, "Local", "Myanmar", "Ayeyarwaddy Region", category.name])
-                product.images = ["https://cmhlprodblobstorage1.blob.core.windows.net/sys-master-cmhlprodblobstorage1/h4f/h67/9302416621598/1000Wx1000H_Default-WorkingFormat_null"];
+                product.images = [product.image];
                 product.merchant = user_array[i]._id;
                 product.description = "This is a local product of Myanmar (Ayeyarwaddy Region). It is a high-quality product that is grown and harvested with care. The product is known for its freshness and taste, making it a popular choice among consumers.";
                 product.status = "active";
                 product.shipping = 1000;
                 product.inventory = 30;
-                product.price = parseFloat(product.price.replace(",", ""));
-
+                product.price = 10000;
                 product.category = category._id.toString();
                 product.type = type._id.toString();
+
+
+                console.log(product);
+
                 return product;
             }))
+
+
+            console.log(products);
+
+
 
             await Product.insertMany(products)
 

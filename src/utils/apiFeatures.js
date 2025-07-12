@@ -1,3 +1,5 @@
+const AppError = require("./appError");
+
 class ApiFeature {
   constructor(query, queryString) {
     this.query = query;
@@ -24,7 +26,23 @@ class ApiFeature {
         }
       }
     }
-    this.query = this.query.find(filter);
+
+    for (const [obj, key] of Object.entries(filter)) {
+      if (
+        (typeof key === "object" && Object.keys(key).length === 0) ||
+        key === "" ||
+        key == null
+      ) {
+        delete filter[obj];
+      }
+    }
+
+
+    try {
+      this.query = this.query.find(filter);
+    } catch (e) {
+      throw new AppError("Something went wrong please check", 400)
+    }
 
     return this;
   }

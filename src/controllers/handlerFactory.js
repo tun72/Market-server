@@ -6,7 +6,9 @@ const mongoose = require("mongoose");
 exports.getAll = ({ Model, fields = [] }) =>
     catchAsync(async (req, res, next) => {
         let filter = {};
-        const length = await Model.countDocuments()
+
+        const filteredQuery = new ApiFeature(Model.find(filter), req.query).filter();
+        const length = await filteredQuery.query.countDocuments();
         const feature = new ApiFeature(Model.find(filter), req.query)
             .filter()
             .sort()
@@ -15,7 +17,6 @@ exports.getAll = ({ Model, fields = [] }) =>
             .populate(fields);
 
         let doc = await feature.query;
-
         return res.status(200).json({
             status: "sucess",
             results: doc.length,

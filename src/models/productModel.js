@@ -1,7 +1,6 @@
 const { Schema, model } = require('mongoose');
 const { ObjectId } = Schema.Types;
 
-// const isValidURL = (v) => /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/.test(v);
 
 const typeSchema = new Schema({
     name: { type: String, required: true, unique: true },
@@ -84,8 +83,8 @@ const productSchema = new Schema({
         required: [true, 'Product price is required'],
     },
     discount: {
-        type: Number,
-        default: 0
+        type: ObjectId,
+        ref: "discount"
     },
     inventory: {
         type: Number,
@@ -99,6 +98,10 @@ const productSchema = new Schema({
             message: 'Invalid product status'
         },
         default: 'draft'
+    },
+    isFeatured: {
+        type: Boolean,
+        default: false
     },
     // optional
     // warranty: {
