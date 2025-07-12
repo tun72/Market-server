@@ -2,16 +2,18 @@
 const fs = require("fs/promises");
 const path = require("path");
 
-exports.fileDelete = async (path) => {
-  try {
-    console.log(path);
 
+const removeFiles = async (path) => {
+  try {
     await fs.unlink(path);
   } catch (err) {
-    console.log(err);
-
+    // console.log(err);
     return null;
   }
+}
+
+exports.fileDelete = async (path) => {
+  await removeFiles(path)
 };
 
 
@@ -24,7 +26,7 @@ exports.removeImages = async (originalFiles, optimizeFiles, target = "/uploads/i
         target,
         originalFile
       );
-      await fileDelete(originalfilePath)
+      await removeFiles(originalfilePath)
     }
   }
 
@@ -36,7 +38,7 @@ exports.removeImages = async (originalFiles, optimizeFiles, target = "/uploads/i
         "/uploads/optimize",
         optimizedFile
       );
-      await fileDelete(optimizefilePath);
+      await removeFiles(optimizefilePath);
     }
   }
 }

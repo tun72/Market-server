@@ -34,16 +34,13 @@ const calcTotalPrice = async (products) => {
 
     return { total: total / 100 };
 };
-// Optimized getOrderByCode for high concurrency and large datasets
+
 exports.getOrderByCode = catchAsync(async (req, res, next) => {
     const userId = req.userId;
-    // Only select _id for existence check, avoid fetching full user doc
     const userExists = await User.exists({ _id: userId });
     if (!userExists) {
         return next(new AppError("User not found.", 404));
     }
-
-    // Use lean() for lightweight docs, and aggregate for efficient calculation
     const orders = await Order.find({ code: req.params.code, userId })
         .populate({ path: "productId", select: "price shipping name images" })
         .lean();
@@ -96,7 +93,7 @@ exports.getOrders = catchAsync(async (req, res, next) => {
                 orderLists: { $sum: 1 },
                 status: { $first: "$status" },
                 createdAt: { $first: "$createdAt" },
-                isDelivered: { $first: "$isDelivered" }
+                isDelivered: { $first: "$isDelivered" },
             }
         },
         {
@@ -120,6 +117,7 @@ exports.getOrders = catchAsync(async (req, res, next) => {
 
 
 })
+
 // cancel order if isn't still checkout within 5 mins
 exports.createOrder = [
     body("products", "Invalid Product Id").notEmpty(),
@@ -128,7 +126,6 @@ exports.createOrder = [
         if (errors.length) {
             return next(new AppError(errors[0].msg, 400));
         }
-
         const user = await User.findById(req.userId).lean();
         if (!user) {
             return next(new AppError("You are not authenticated. Please login", 401));
@@ -154,9 +151,8 @@ exports.createOrder = [
                 productMap[id] = quantity;
             }
         });
+
         products = Object.entries(productMap).map(([id, quantity]) => ({ id, quantity }));
-
-
 
         const productIds = products.map(p => p.id);
 
@@ -259,8 +255,9 @@ exports.createCheckoutSession = [
         const orders = await Order.find({ code, status: "pending" })
 
         if (!orders.length > 0) {
-            return next(new AppError("Invalid order code", 400))
+            return next(new AppError("Invalid order code.", 400))
         }
+
 
         const productIds = orders.map((order) => order.productId)
 
@@ -312,25 +309,9 @@ exports.createCheckoutSession = [
             mode: "payment",
             success_url: `${process.env.FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${process.env.FRONTEND_URL}/payment-cancel`,
-            // discounts: coupon
-            //     ? [
-            //         {
-            //             coupon: await createStripeCoupon(coupon.discountPercentage),
-            //         },
-            //     ]
-            //     : [],
             metadata: {
                 userId: req.user._id.toString(),
                 orderCode: code,
-                products: JSON.stringify(
-                    products.map((p, i) => ({
-                        id: p._id,
-                        // merchant: p.merchant,
-                        // quantity: orders[i].quantity,
-                        // price: p.price,
-                        // shipping: p.shipping,
-                    }))
-                ),
                 totalShipping: totalShipping,
                 totalAmount: totalAmount
             },
@@ -356,58 +337,43 @@ exports.checkoutSuccess = [
         if (errors.length) {
             return next(new AppError(errors[0].msg, 400));
         }
-
-        console.log("hit");
-
-
         const { sessionId } = req.body;
-
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
         if (session.payment_status !== "paid") {
             return next(new AppError("Payment not completed", 400))
         }
-
         if (!session) {
             return next(new AppError("Session not found!", 400))
         }
-
-        let productIds = JSON.parse(session.metadata.products);
-
-        productIds = productIds.map((product) => ({ _id: product.id }))
         const orderCode = session.metadata.orderCode;
         const totalAmount = session.metadata.totalAmount;
-
-
-
         const orders = await Order.find({ code: orderCode })
 
-        if (!Array.isArray(orders) || orders.length === 0) {
-            return res.status(400).json({ error: "Invalid or empty orders" });
+        // Handle concurrency: restore inventory for cancelled orders, and ensure atomicity
+        const restoreOps = [];
+        for (const order of orders) {
+            if (order.status === "cancel") {
+                // Find the quantity for this order
+                const quantity = order.quantity;
+                restoreOps.push({
+                    updateOne: {
+                        filter: { _id: order.productId },
+                        update: { $inc: { inventory: -quantity } }
+                    }
+                });
+            }
         }
 
-        // Update orders in bulk for performance
-        await Order.updateMany(
-            { code: orderCode },
-            {
-                $set: {
-                    stripeSessionId: sessionId,
-                    isPaid: true,
-                    status: "accept",
-                    payment: "stripe"
-                }
-            }
-        );
+        if (restoreOps.length > 0) {
+            await Product.bulkWrite(restoreOps);
+        }
 
-        // Prepare bulk update for product inventory
-        // const bulkOps = products.map((product) => ({
-        //     updateOne: {
-        //         filter: { _id: product.id },
-        //         update: { $inc: { inventory: -product.quantity } }
-        //     }
-        // }));
+        if (!orders.length > 0) {
+            return next(new AppError("Invalid order code", 400))
+        }
 
-
+        const productIds = orders.map((order) => order.productId)
 
         const products = await Product.find({ _id: { $in: productIds } }).lean();
 
@@ -429,6 +395,35 @@ exports.checkoutSuccess = [
             }
         }
 
+
+
+
+
+
+        if (!Array.isArray(orders) || orders.length === 0) {
+            return res.status(400).json({ error: "Invalid or empty orders" });
+        }
+
+        // Update orders in bulk for performance
+        await Order.updateMany(
+            { code: orderCode },
+            {
+                $set: {
+                    stripeSessionId: sessionId,
+                    isPaid: true,
+                    status: "pending",
+                    payment: "stripe"
+                }
+            }
+        );
+        // Prepare bulk update for product inventory
+        // const bulkOps = products.map((product) => ({
+        //     updateOne: {
+        //         filter: { _id: product.id },
+        //         update: { $inc: { inventory: -product.quantity } }
+        //     }
+        // }));
+
         // if (bulkOps.length > 0) {
         //     await Product.bulkWrite(bulkOps);
         // }
@@ -448,10 +443,3 @@ exports.checkoutSuccess = [
     }),
 ];
 
-
-
-// I currently live in the campus hostel.
-
-// Is it true that software engineering jobs in New York have a really high pay rate?
-
-// What should I continue learning?
