@@ -5,6 +5,7 @@ const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
 const User = require("../models/userModel");
 const { generateAccessToken, generateRefreshToken } = require("../utils/generateToken");
+const Admin = require("../models/adminModel");
 dotenv.config()
 
 const authMiddleware = catchAsync(async (req, res, next) => {
@@ -75,8 +76,6 @@ const authMiddleware = catchAsync(async (req, res, next) => {
     } else {
         try {
             const decoded = await promisify(jwt.verify)(accessToken, process.env.SECRET_KEY);
-
-
             req.userId = decoded.id;
             next()
 

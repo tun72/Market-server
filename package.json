@@ -12,6 +12,7 @@
     "db:delete": "node ./dev-data/data/import-dev-data.js --delete",
     "work": "nodemon src/jobs/workers/ImageWorker.js",
     "order": "nodemon src/jobs/workers/OrderWorker.js",
+    "mail": "nodemon src/jobs/workers/EmailWorker.js",
     "scrape": "node ./scrape/productScrape.js"
   },
   "author": "tun72",

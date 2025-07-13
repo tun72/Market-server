@@ -29,7 +29,7 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
     // need to make this with aggregation and random limit 7
     const products = await Product.aggregate([
         { $match: { isFeatured: true } },
-        { $sample: { size: 7 } },
+        { $sample: { size: 5 } },
         { $addFields: { id: "$_id" } },
         { $project: { _id: 0, __v: 0 } }
 
@@ -67,11 +67,6 @@ exports.getRelatedProduct = catchAsync(async (req, res, next) => {
     if (!productId) {
         return next(new AppError("Type Id is required.", 400));
     }
-
-    // let { type } = req.body;
-
-    // console.log(typeId);
-
 
     const products = await Product.aggregate([
         // { $match: { type: typeId } },
@@ -116,7 +111,6 @@ exports.getAllCategories = factory.getAll({
 // events
 exports.getAllEvents = catchAsync(async (req, res, next) => {
     const events = await Event.find().select("name type discount poster status")
-
     const filterEvents = events.filter((event) => event.status === "upcoming")
     return res.status(200).json({ message: "sucess", filterEvents })
 })

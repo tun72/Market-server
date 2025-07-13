@@ -6,6 +6,8 @@ const catchAsync = require("../utils/catchAsync");
 const dotenv = require("dotenv");
 dotenv.config()
 const { generateAccessToken, generateRefreshToken, generateRandToken } = require("../utils/generateToken");
+const Seller = require("../models/sellerModel");
+const Admin = require("../models/adminModel");
 
 const createSendToken = async ({ user, res, statusCode, next }) => {
     if (!user) return next(new AppError("User is required to create token", 404));
@@ -67,6 +69,10 @@ exports.signIn = [
         if (!user || !(await user.correctPassword(password, user.password)))
             return next(new AppError("Incorrect Email or Password.", 400));
 
+        if (user.role !== "customer") {
+            return next(new AppError("You are not customer", 403));
+        }
+
         createSendToken({ user, res, statusCode: 200, next });
     })]
 
@@ -103,4 +109,66 @@ exports.signUp = [
         const newUser = await Customer.create({ name, password, passwordConfirm, email, randToken: generateRandToken() });
 
         createSendToken({ user: newUser, res, statusCode: 201, next });
+    })]
+
+
+exports.merchantSignIn = [
+    body("email", "Invalid Email").trim("").isEmail().notEmpty(),
+    body("password").trim("")
+        .notEmpty()
+        .isLength({ min: 8 })
+        .withMessage("Password must be minium of 8 characters."),
+    catchAsync(async (req, res, next) => {
+        const errors = validationResult(req).array({ onlyFirstError: true });
+        if (errors.length) {
+            if (req.files && req.files.length > 0) {
+                const originalFiles = req.files.map((file) => file.filename)
+                removeImages(originalFiles)
+            }
+            return next(new AppError(errors[0].msg, 400));
+        }
+        const { email, password } = req.body;
+        const user = await Seller.findOne({ email }).select("+password");
+
+
+
+        if (!user || !(await user.correctPassword(password, user.password)))
+            return next(new AppError("Incorrect Email or Password.", 400));
+
+
+        if (user.role !== "seller") {
+            return next(new AppError("You are not merchant", 403));
+        }
+
+
+        createSendToken({ user, res, statusCode: 200, next });
+    })]
+
+
+exports.adminSignIn = [
+    body("email", "Invalid Email").trim("").isEmail().notEmpty(),
+    body("password").trim("")
+        .notEmpty()
+        .isLength({ min: 8 })
+        .withMessage("Password must be minium of 8 characters."),
+    catchAsync(async (req, res, next) => {
+        const errors = validationResult(req).array({ onlyFirstError: true });
+        if (errors.length) {
+            if (req.files && req.files.length > 0) {
+                const originalFiles = req.files.map((file) => file.filename)
+                removeImages(originalFiles)
+            }
+            return next(new AppError(errors[0].msg, 400));
+        }
+        const { email, password } = req.body;
+        const user = await Admin.findOne({ email }).select("+password");
+
+        if (!user || !(await user.correctPassword(password, user.password)))
+            return next(new AppError("Incorrect Email or Password.", 400));
+
+        if (user.role !== "admin") {
+            return next(new AppError("You are not admin", 403));
+        }
+
+        createSendToken({ user, res, statusCode: 200, next });
     })]
