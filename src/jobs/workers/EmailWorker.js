@@ -2,6 +2,7 @@ const { Worker } = require("bullmq");
 const { redis } = require("../../config/redisClient");
 const { sendEmail } = require("../../utils/sendMail");
 
+
 const worker = new Worker(
     "emailQueue",
     async (job) => {

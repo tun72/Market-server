@@ -17,7 +17,7 @@ router.use("/api/v1/auth", authRoute);
 router.use("/api/v1/seller", authMiddleware, authorise(true, "seller"), sellerRoute);
 // router.use("/api/v1/categories", categoryRoute);
 
-router.use("/api/v1/admin", adminRoute);
+router.use("/api/v1/admin", authMiddleware, authorise(true, "admin"), adminRoute);
 
 router.use("/api/v1/user", userRoute)
 

@@ -1,6 +1,7 @@
 
 
 const Seller = require("../../models/sellerModel");
+const catchAsync = require("../../utils/catchAsync");
 const factory = require("../handlerFactory");
 
 // products
@@ -15,3 +16,9 @@ exports.getMerchantById = factory.getOne({
 })
 
 
+exports.getReliableMerchants = catchAsync(async (req, res, next) => {
+    const merchants = await Seller.aggregate([
+        { $sample: { size: 6 } }
+    ])
+    return res.status(200, { message: "success", isSuccess: true, merchants })
+})

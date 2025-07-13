@@ -12,6 +12,8 @@ const Seller = require("../../models/sellerModel");
 const orderQueue = require("../../jobs/queues/OrderQueue");
 const mongoose = require("mongoose");
 const ApiFeature = require("../../utils/apiFeatures");
+const emailQueue = require("../../jobs/queues/EmailQueue");
+const { getEmailContent } = require("../../utils/sendMail");
 dotenv.config()
 
 // Calculate total price including shipping and discount
@@ -395,11 +397,6 @@ exports.checkoutSuccess = [
             }
         }
 
-
-
-
-
-
         if (!Array.isArray(orders) || orders.length === 0) {
             return res.status(400).json({ error: "Invalid or empty orders" });
         }
@@ -429,6 +426,19 @@ exports.checkoutSuccess = [
         // }
 
         // remove orderqueue from redis 
+
+        const email = await getEmailContent({ filename: "orderSuccess.html", data: {} })
+
+        emailQueue.add(
+            "email-user",
+            {
+                receiver: "test@gmail.com",
+                subject: "Your OTP CODE",
+                html: email,
+            },
+            { removeOnComplete: true, removeOnFail: 1000 }
+        );
+
         await orderQueue.remove(`order:${orderCode}`);
 
         // TODO: Add notification to merchant (implement as needed, e.g., queue)
