@@ -333,7 +333,7 @@ exports.getRelatedProduct = catchAsync(async (req, res, next) => {
 // top types 
 exports.getPopularTypes = catchAsync(async (req, res, next) => {
     const types = await Type.aggregate([
-        { $sample: { size: 9 } },
+        { $sample: { size: 7 } },
     ])
     return res.status(200).json({ message: "Success", isSuccess: true, types })
 });
