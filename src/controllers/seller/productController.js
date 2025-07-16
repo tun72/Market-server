@@ -12,34 +12,20 @@ const { Product } = require("../../models/productModel");
 const mongoose = require("mongoose")
 const factory = require("../handlerFactory");
 const { removeImages } = require("../../utils/fileDelete");
+const Seller = require("../../models/sellerModel");
 
 
 
 exports.getAllProducts = [
     catchAsync(async (req, res, next) => {
-        // if (!req.user) {
-        //     return next(new AppError("Login required", 403))
-        // }
-        // const products = await Product.find()
-        // console.log(products);
-
-
-        // const user = req.userId
-        // if (!user) {
-        //     if (req.file) {
-        //         await removeFile(req.file.filename);
-        //     }
-        //     return next(
-        //         createError(
-        //             "This account is not registered.",
-        //             401,
-        //             errorCode.unauthenticated
-        //         )
-        //     );
-        // }
-
-        // req.query.merchant = req.userId
-
+        if (!req.user) {
+            return next(new AppError("Login required", 403))
+        }
+        const seller = await Seller.findById(req.userId)
+        if (!seller) {
+            next(new AppError("Access denied", 403))
+        }
+        req.query.merchant = seller._id
         next()
     }), factory.getAll({
         Model: Product,

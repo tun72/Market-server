@@ -7,6 +7,9 @@ exports.getAll = ({ Model, fields = [] }) =>
     catchAsync(async (req, res, next) => {
         let filter = {};
 
+        const page = req.query.page * 1 || 1;
+        const limit = req.query.limit * 1 || 100;
+
         const filteredQuery = new ApiFeature(Model.find(filter), req.query).filter();
         const length = await filteredQuery.query.countDocuments();
         const feature = new ApiFeature(Model.find(filter), req.query)
@@ -19,10 +22,14 @@ exports.getAll = ({ Model, fields = [] }) =>
         let doc = await feature.query;
         return res.status(200).json({
             status: "sucess",
-            results: doc.length,
-            total: length,
             data: doc,
-            isSuccess: true
+            isSuccess: true,
+            pagination: {
+                entriesPerPage: limit,
+                page,
+                totalResult: length,
+                foundResult: doc.length,
+            }
         });
     });
 

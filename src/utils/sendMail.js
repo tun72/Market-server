@@ -4,26 +4,25 @@ const fs = require("node:fs/promises")
 const path = require("path")
 dotenv.config()
 const sendEmail = async ({ receiver, subject, html }) => {
-    // const transporter = nodemailer.createTransport({
-    //     service: "gmail",
-    //     auth: {
-    //         user: process.env.SENDER_MAIL,
-    //         pass: process.env.SENDER_PASSWORD,
-    //     },
-    // });
-
     const transporter = nodemailer.createTransport({
-        host: 'sandbox.smtp.mailtrap.io',
-        port: 2525,
-        secure: false, // use SSL
+        service: "gmail",
         auth: {
             user: process.env.SENDER_EMAIL,
             pass: process.env.SENDER_PASSWORD,
-        }
+        },
     });
 
+    // const transporter = nodemailer.createTransport({
+    //     host: 'sandbox.smtp.mailtrap.io',
+    //     port: 2525,
+    //     secure: false, // use SSL
+    //     auth: {
+    //         user: process.env.SENDER_EMAIL,
+    //         pass: process.env.SENDER_PASSWORD,
+    //     }
+    // });
     const info = await transporter.sendMail({
-        from: "ayeyar-market@email.com",
+        from: process.env.SENDER_EMAIL,
         to: receiver,
         subject: subject,
         html: html,
