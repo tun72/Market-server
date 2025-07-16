@@ -90,24 +90,42 @@ exports.getOrders = catchAsync(async (req, res, next) => {
     const orderStats = await Order.aggregate([
         { $match: { userId: user._id } },
         {
+            $lookup: {
+                from: "products",
+                localField: "productId",
+                foreignField: "_id",
+                as: "productId"
+            }
+        },
+        { $unwind: { path: "$productId", preserveNullAndEmptyArrays: true } },
+        {
             $group: {
                 _id: "$code",
                 orderLists: { $sum: 1 },
                 status: { $first: "$status" },
                 createdAt: { $first: "$createdAt" },
                 isDelivered: { $first: "$isDelivered" },
+                productId: { $first: "$productId" }
             }
         },
+        {
+            $addFields: {
+                "image": { $first: "$productId.images" }
+            }
+        },
+
         {
             $project: {
                 code: "$_id",
                 orderLists: 1,
                 status: 1,
                 createdAt: 1,
+                image: 1,
+
                 _id: 0
             }
         }
-    ]).skip(skip).limit(limit)
+    ]).skip(skip).limit(limit).sort("-createdAt")
 
 
     res.status(200).json({
@@ -432,8 +450,8 @@ exports.checkoutSuccess = [
         emailQueue.add(
             "email-user",
             {
-                receiver: "test@gmail.com",
-                subject: "Your OTP CODE",
+                receiver: "tuntunmyint10182003@gmail.com",
+                subject: "Ayeyar Market Orders Detail",
                 html: email,
             },
             { removeOnComplete: true, removeOnFail: 1000 }

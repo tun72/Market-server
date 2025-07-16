@@ -5,6 +5,9 @@ const customerSchema = new mongoose.Schema({
     phone: {
         type: String,
     },
+    googleId: {
+        type: String,
+    },
     shippingAddresses: [
         {
             street: String,
@@ -18,10 +21,13 @@ const customerSchema = new mongoose.Schema({
             },
         },
     ],
+    image: {
+        type: String
+    },
     paymentMethods: [
         {
             cardType: String,
-            last4: String,
+            last: String,
             expiry: String,
             isDefault: Boolean,
         },

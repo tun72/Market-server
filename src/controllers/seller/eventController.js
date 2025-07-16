@@ -41,9 +41,6 @@ exports.addDiscount = catchAsync(async (req, res, next) => {
     if (!product) {
         return res.status(404).json({ message: 'Product not found' });
     }
-    // if (product?.seller?.toString() !== req.user._id.toString()) {
-    //     return res.status(403).json({ message: 'Not the product owner' });
-    // }
     if (!participant) {
         return res.status(404).json({ message: 'Participant not found for this event' });
     }
