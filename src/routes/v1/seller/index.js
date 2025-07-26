@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const eventController = require("../../../controllers/seller/eventController");
 const productController = require("../../../controllers/seller/productController");
+const orderController = require("../../../controllers/seller/orderController");
+
 const upload = require("../../../middlewares/uploadFile");
 
 
@@ -24,6 +26,7 @@ router.delete("/products", productController.deleteProduct)
 
 
 // router.get("/:id", productController.getProductById);
+router.get("/orders", orderController.getAllOrders)
 
 
 
