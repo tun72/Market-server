@@ -6,10 +6,8 @@ const mongoose = require("mongoose");
 exports.getAll = ({ Model, fields = [] }) =>
     catchAsync(async (req, res, next) => {
         let filter = {};
-
         const page = req.query.page * 1 || 1;
         const limit = req.query.limit * 1 || 100;
-
         const filteredQuery = new ApiFeature(Model.find(filter), req.query).filter();
         const length = await filteredQuery.query.countDocuments();
         const feature = new ApiFeature(Model.find(filter), req.query)
@@ -51,9 +49,7 @@ exports.getOne = ({ Model, fields = [] }) =>
 
         res.status(200).json({
             status: "success",
-            data: {
-                data: doc,
-            },
+            data: doc,
             isSuccess: true
         });
     });
@@ -66,9 +62,7 @@ exports.createOne = Model =>
 
         res.status(201).json({
             status: "success",
-            data: {
-                data: doc
-            },
+            data: doc,
             isSuccess: true
         })
     })
@@ -87,9 +81,7 @@ exports.updateOne = Model =>
 
         return res.status(200).json({
             status: "success",
-            data: {
-                data: doc
-            },
+            data: doc,
             isSuccess: true
         })
     })
@@ -105,7 +97,6 @@ exports.deleteOne = Model => catchAsync(async (req, res, next) => {
 
     return res.status(204).json({
         status: "success",
-        data: [],
         isSuccess: true
     })
 })

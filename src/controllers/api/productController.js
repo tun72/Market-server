@@ -28,9 +28,6 @@ exports.getProductById = catchAsync(async (req, res, next) => {
     if (!mongoose.isValidObjectId(productId)) {
         return next(new AppError("Is not valid ID", 404));
     }
-
-
-
     const products = await Product.aggregate([
         // Match main product
         { $match: { _id: new mongoose.Types.ObjectId(productId) } },

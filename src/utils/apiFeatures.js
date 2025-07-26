@@ -66,7 +66,6 @@ class ApiFeature {
     }
     return this;
   }
-
   paginate() {
 
     const page = this.queryString.page * 1 || 1;
@@ -77,15 +76,31 @@ class ApiFeature {
 
     return this;
   }
-
-
-
   populate(fields) {
     if (this.queryString.fields) return this;
 
     this.query = this.query.populate(`${fields.join(" ")}`);
 
     return this;
+  }
+  custom() {
+    if (this.queryString.query === "today") {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+
+      // Filter documents created today
+      this.query = this.query.find({
+        createdAt: {
+          $gte: startOfToday,
+          $lte: endOfToday
+        }
+      });
+    }
+
+    return this
   }
 }
 
