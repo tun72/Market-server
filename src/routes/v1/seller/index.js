@@ -23,6 +23,9 @@ router.post("/products", upload.array("images"), productController.createProduct
 router.patch("/products", upload.array("images"), productController.updateProduct)
 router.delete("/products", productController.deleteProduct)
 
+router.delete("/products/images:delete", productController.deleteImage)
+
+
 
 
 // router.get("/:id", productController.getProductById);

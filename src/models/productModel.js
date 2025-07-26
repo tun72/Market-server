@@ -76,7 +76,7 @@ const productSchema = new Schema({
     }],
     images: [{
         type: String,
-        required: true
+        required: true,
     }],
     price: {
         type: Number,
@@ -135,6 +135,10 @@ const productSchema = new Schema({
     toObject: { virtuals: true }
 });
 
+
+productSchema.virtual('optimize_images').get(function () {
+    return this.images.map((img) => img.split(".")[0] + ".webp")
+});
 
 typeSchema.virtual('categories', {
     ref: 'Type',

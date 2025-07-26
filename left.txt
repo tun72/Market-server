@@ -1,3 +1,5 @@
 // admin
 
 -> delete seller
+
+-> make image response in optimize file
