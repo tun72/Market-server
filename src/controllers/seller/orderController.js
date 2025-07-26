@@ -4,6 +4,7 @@ const Seller = require("../../models/sellerModel");
 const AppError = require("../../utils/appError");
 const catchAsync = require("../../utils/catchAsync");
 const factory = require("../handlerFactory");
+const mongoose = require("mongoose")
 
 exports.getAllOrders = [
     catchAsync(async (req, res, next) => {
@@ -29,7 +30,7 @@ exports.updateOrders = [
     body("status", "Status is required").notEmpty().custom((value) => {
         const all_status = ["pending", "confirm", "cancel", "delivery", "success"]
 
-        if (!all_status.include(value)) {
+        if (!all_status.includes(value)) {
             return false
         }
         return true
@@ -38,12 +39,12 @@ exports.updateOrders = [
     catchAsync(async (req, res, next) => {
         const errors = validationResult(req).array({ onlyFirstError: true });
         if (errors.length) {
-            return next(new AppError(errors[0].msg, 400));
+            next(new AppError(errors[0].msg, 400));
         }
         let { orderId, status } = req.body;
         const order = await Order.findById(orderId)
         if (!order) {
-            return next(new AppError("No order found with that Id.", 404))
+            next(new AppError("No order found with that Id.", 404))
         }
         await Order.findByIdAndUpdate(order.id, { status: status })
         res.status(200).json({ message: "Order updated successfully." })
