@@ -33,6 +33,8 @@ router.get("/products/:id", productController.getProductById)
 
 // router.get("/:id", productController.getProductById);
 router.get("/orders", orderController.getAllOrders)
+router.patch("/orders/update", orderController.updateOrders)
+
 
 
 
