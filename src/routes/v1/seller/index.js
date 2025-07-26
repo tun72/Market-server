@@ -19,12 +19,15 @@ router.get("/participants/:id", eventController.getParticipant)
 
 // products
 router.get("/products", productController.getAllProducts)
+
 router.post("/products", upload.array("images"), productController.createProduct)
 router.patch("/products", upload.array("images"), productController.updateProduct)
 router.delete("/products", productController.deleteProduct)
 
 router.delete("/products/images:delete", productController.deleteImage)
 
+
+router.get("/products/:id", productController.getProductById)
 
 
 

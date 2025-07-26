@@ -1,6 +1,6 @@
 const AppError = require("../../utils/appError");
 const catchAsync = require("../../utils/catchAsync");
-const { body, validationResult } = require("express-validator");
+const { body, validationResult, param } = require("express-validator");
 const { checkPhotoIfNotExistArray } = require("../../utils/check");
 const { createOneProduct, updateOneProduct } = require("../../services/productServices");
 const ImageQueue = require("../../jobs/queues/ImageQueue");
@@ -29,30 +29,41 @@ exports.getAllProducts = [
         next()
     }), factory.getAll({
         Model: Product,
+        fields: ["brand", "category", "tags", "merchant", "type"],
     })
 ]
 
 exports.getProductById = [
+    param("id")
+        .notEmpty()
+        .withMessage("Product ID is required")
+        .isMongoId()
+        .withMessage("Invalid product ID format"),
     catchAsync(async (req, res, next) => {
-
-        // if (!req.user) {
-        //     return next(new AppError("Login required", 403))
-        // }
-        // const seller = await Seller.findById(req.userId)
-        // if (!seller) {
-        //     next(new AppError("Access denied", 403))
-        // }
-        // req.query.merchant = seller._id
-        // req.query.
-        // if (!req.user) {
-        //     return next(new AppError("Login required", 403))
-        // }
-        // req.query.merchant = "6828bc48f26e66121cf78eb3"
-
-        // need to check merchant really own the product
-        next()
+        const { id } = req.params;
+        const { userId, user } = req;
+        if (!user) {
+            return next(new AppError("Authentication required", 401));
+        }
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return next(new AppError("Invalid product ID format", 400));
+        }
+        const seller = await Seller.findById(userId).lean().select('_id');
+        if (!seller) {
+            return next(new AppError("Seller account not found", 404));
+        }
+        const product = await Product.findOne({
+            _id: id,
+            merchant: seller._id
+        }).lean().select('_id merchant');
+        if (!product) {
+            return next(new AppError("Product not found or access denied", 404));
+        }
+        req.seller = seller;
+        next();
     }), factory.getOne({
         Model: Product,
+        fields: ["brand", "category", "tags", "merchant", "type"],
     })
 ]
 

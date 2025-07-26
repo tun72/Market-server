@@ -1,3 +1,4 @@
+const { body, validationResult } = require("express-validator");
 const Order = require("../../models/orderModel");
 const Seller = require("../../models/sellerModel");
 const AppError = require("../../utils/appError");
@@ -15,37 +16,36 @@ exports.getAllOrders = [
         next()
     }), factory.getAll({
         Model: Order,
+        fields: ["productId", "userId"]
+
     })
 ]
 
 
-// exports.updateOrders = [
-//     body("orderId", "Order Id is required.").custom((id) => {
-//         return mongoose.Types.ObjectId.isValid(id);
-//     }),
-//     body("status", "Status is required").notEmpty(),
+exports.updateOrders = [
+    body("orderId", "Order Id is required.").custom((id) => {
+        return mongoose.Types.ObjectId.isValid(id);
+    }),
+    body("status", "Status is required").notEmpty().custom((value) => {
+        const all_status = ["pending", "confirm", "cancel", "delivery", "success"]
 
-//     catchAsync(async (req, res, next) => {
-//         const errors = validationResult(req).array({ onlyFirstError: true });
-//         if (errors.length) {
-//             return next(new AppError(errors[0].msg, 400));
-//         }
+        if (!all_status.include(value)) {
+            return false
+        }
+        return true
+    }, "Invalid status."),
 
-//         let { orderId } = req.body;
-
-//         const order = await Order.findById(orderId)
-
-//         if (!order) {
-//             return next(new AppError("No order found with that Id.", 404))
-//         }
-
-//         const originalFiles = product.images;
-//         const optimizeFiles = originalFiles.map((file) => file.split(".")[0] + ".webp")
-//         await removeImages(originalFiles, optimizeFiles);
-
-//         await Product.findByIdAndDelete(product._id)
-
-//         res.status(200).json({ message: "Product successfully deleted." })
-
-//     })
-// ]
+    catchAsync(async (req, res, next) => {
+        const errors = validationResult(req).array({ onlyFirstError: true });
+        if (errors.length) {
+            return next(new AppError(errors[0].msg, 400));
+        }
+        let { orderId, status } = req.body;
+        const order = await Order.findById(orderId)
+        if (!order) {
+            return next(new AppError("No order found with that Id.", 404))
+        }
+        await Order.findByIdAndUpdate(order.id, { status: status })
+        res.status(200).json({ message: "Order updated successfully." })
+    })
+]
