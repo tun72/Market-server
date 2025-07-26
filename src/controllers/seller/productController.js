@@ -34,6 +34,16 @@ exports.getAllProducts = [
 
 exports.getProductById = [
     catchAsync(async (req, res, next) => {
+
+        // if (!req.user) {
+        //     return next(new AppError("Login required", 403))
+        // }
+        // const seller = await Seller.findById(req.userId)
+        // if (!seller) {
+        //     next(new AppError("Access denied", 403))
+        // }
+        // req.query.merchant = seller._id
+        // req.query.
         // if (!req.user) {
         //     return next(new AppError("Login required", 403))
         // }
@@ -53,9 +63,6 @@ exports.createProduct = [
     body("description", "Description is required.").trim("").notEmpty().escape(),
     body("price", "Price is required.")
         .isFloat({ min: 0.1 })
-        .isDecimal({ decimal_digits: "1,2" }),
-    body("discount", "Discount is required")
-        .isFloat({ min: 0 })
         .isDecimal({ decimal_digits: "1,2" }),
     body("inventory", "Inventory is required").isInt({ min: 1 }),
     body("category", "Category is required").trim("").notEmpty().escape(),
@@ -173,9 +180,6 @@ exports.updateProduct = [
     body("price", "Price is required.")
         .isFloat({ min: 0.1 })
         .isDecimal({ decimal_digits: "1,2" }),
-    body("discount", "Discount is required")
-        .isFloat({ min: 0 })
-        .isDecimal({ decimal_digits: "1,2" }),
     body("inventory", "Inventory is required").isInt({ min: 1 }),
     body("category", "Category is required").trim("").notEmpty().escape(),
     body("type", "Type is required.").trim("").notEmpty().escape(),
@@ -260,10 +264,7 @@ exports.updateProduct = [
             shipping,
         }
 
-
         if (req.files && req.files.length > 0) {
-
-
             const originalFiles = product.images;
             const optimizeFiles = originalFiles.map((file) => file.split(".")[0] + ".webp")
             await removeImages(originalFiles, optimizeFiles);
