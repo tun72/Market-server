@@ -131,9 +131,6 @@ exports.getOrders = catchAsync(async (req, res, next) => {
     });
 })
 
-// const mongoose = require('mongoose');
-// const { body, validationResult } = require('express-validator');
-
 // cancel order if isn't still checkout within 5 mins
 exports.createOrder = [
     body("products", "Invalid Product Id").notEmpty(),
@@ -292,20 +289,16 @@ exports.createOrder = [
     }),
 ];
 
-exports.cashOnDelivery = [
-    body("code", "Order code is required.").notEmpty(),
-
-]
-
 exports.createCheckoutSession = [
     body("code", "Order code is required.").notEmpty(),
+    body("payment", "Payment type is required").notEmpty(),
     catchAsync(async (req, res, next) => {
         const errors = validationResult(req).array({ onlyFirstError: true });
         if (errors.length) {
             return next(new AppError(errors[0].msg, 400));
         }
 
-        const { code } = req.body;
+        const { code, payment } = req.body;
         const userId = req.userId;
 
 
@@ -494,9 +487,6 @@ exports.createCheckoutSession = [
             if (error instanceof AppError) {
                 return next(error);
             }
-
-            console.error('Checkout session creation failed:', error);
-
             // Handle specific Stripe errors
             if (error.type === 'StripeCardError') {
                 return next(new AppError('Payment processing error. Please try again.', 400));
@@ -514,7 +504,6 @@ exports.createCheckoutSession = [
         }
     }),
 ];
-
 
 exports.checkoutSuccess = [
     body("sessionId", "Invalid Session Id").notEmpty(),
