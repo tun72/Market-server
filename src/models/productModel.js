@@ -90,14 +90,15 @@ const productSchema = new Schema({
         type: Number,
         required: [true, "Inventory is required"]
     },
+
     shipping: { type: Number, min: 0, default: 0 },
     status: {
         type: String,
         enum: {
-            values: ['draft', "pending", 'active', 'archived'],
+            values: ['draft', 'active', 'archived', "out_of_stock"],
             message: 'Invalid product status'
         },
-        default: 'draft'
+        default: 'active'
     },
     isFeatured: {
         type: Boolean,
@@ -121,6 +122,9 @@ const productSchema = new Schema({
         ref: 'User',
         required: [true, 'Merchant reference is required'],
     },
+
+    reservedInventory: { type: Number, default: 0 },
+    soldCount: { type: Number, default: 0 },
 }, {
     timestamps: true,
     toJSON: {

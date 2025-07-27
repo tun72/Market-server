@@ -176,7 +176,7 @@ exports.createProduct = [
         }
 
         const product = await createOneProduct(data)
-        res.status(200).json({ message: "Product successfully created", productId: product._id })
+        res.status(200).json({ message: "Product successfully created", isSuccess: true })
 
     })
 ]
@@ -351,38 +351,6 @@ exports.deleteImage = [
 
 //     })
 // ]
-
-exports.deleteProduct = [
-    body("productId", "Product Id is required.").custom((id) => {
-        return mongoose.Types.ObjectId.isValid(id);
-    }),
-
-    catchAsync(async (req, res, next) => {
-
-        const errors = validationResult(req).array({ onlyFirstError: true });
-        if (errors.length) {
-            return next(new AppError(errors[0].msg, 400));
-        }
-
-        let { productId } = req.body;
-
-        const product = await Product.findById(productId)
-
-        if (!product) {
-            return next(new AppError("No product found with that Id.", 404))
-        }
-
-        const originalFiles = product.images;
-        const optimizeFiles = originalFiles.map((file) => file.split(".")[0] + ".webp")
-        await removeImages(originalFiles, optimizeFiles);
-
-        await Product.findByIdAndDelete(product._id)
-
-        res.status(200).json({ message: "Product successfully deleted." })
-
-    })
-]
-
 
 exports.updateProduct = [
     body("productId", "Product Id is required.").custom((id) => {
@@ -649,8 +617,40 @@ exports.updateProduct = [
             }
         }
 
-        const updatedProduct = await updateOneProduct(product._id, data)
+        await updateOneProduct(product._id, data)
 
-        res.status(200).json({ message: "Product successfully updated", productId: updatedProduct._id })
+        res.status(200).json({ message: "Product successfully updated", isSuccess: true })
+    })
+]
+
+
+exports.deleteProduct = [
+    body("productId", "Product Id is required.").custom((id) => {
+        return mongoose.Types.ObjectId.isValid(id);
+    }),
+
+    catchAsync(async (req, res, next) => {
+
+        const errors = validationResult(req).array({ onlyFirstError: true });
+        if (errors.length) {
+            return next(new AppError(errors[0].msg, 400));
+        }
+
+        let { productId } = req.body;
+
+        const product = await Product.findById(productId)
+
+        if (!product) {
+            return next(new AppError("No product found with that Id.", 404))
+        }
+
+        const originalFiles = product.images;
+        const optimizeFiles = originalFiles.map((file) => file.split(".")[0] + ".webp")
+        await removeImages(originalFiles, optimizeFiles);
+
+        await Product.findByIdAndDelete(product._id)
+
+        res.status(200).json({ message: "Product successfully deleted." })
+
     })
 ]
