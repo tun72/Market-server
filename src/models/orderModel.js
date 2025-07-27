@@ -5,7 +5,6 @@ const orderSchema = new Schema({
     code: {
         type: String,
         index: true,
-        default: () => `ORD-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`
     },
     productId: {
         type: Schema.Types.ObjectId,
@@ -31,7 +30,7 @@ const orderSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ["pending", "confirm", "cancel", "delivery", "success"],
+        enum: ["pending", "confirm", "cancel", "delivery", "success", "expired"],
         default: "pending"
     },
     quantity: {
@@ -47,6 +46,15 @@ const orderSchema = new Schema({
         required: true,
         default: false,
     },
+
+    inventoryReserved: { type: Boolean, default: false },
+    reservedAt: Date,
+    stripePaymentIntentId: String,
+    refundReason: String,
+    refundInitiatedAt: Date,
+    refundedAt: Date,
+    stripeRefundId: String,
+    refundError: String
 }, {
     timestamps: true,
     toJSON: { virtuals: true },

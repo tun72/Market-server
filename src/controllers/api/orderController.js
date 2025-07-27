@@ -34,7 +34,7 @@ const calcTotalPrice = async (products) => {
         // totalDiscount += discount;
     });
 
-    return { total: total / 100 };
+    return { total: total / 100, totalDiscount };
 };
 
 exports.getOrderByCode = catchAsync(async (req, res, next) => {
@@ -80,13 +80,10 @@ exports.getOrders = catchAsync(async (req, res, next) => {
     if (!user) {
         return next(new AppError("User not found.", 404))
     }
-
     const orderCodes = await Order.distinct("code", { userId: user._id });
-
     const page = req.query.page * 1 || 1;
     const limit = req.query.limit * 1 || 100;
     const skip = (page - 1) * limit;
-
     const orderStats = await Order.aggregate([
         { $match: { userId: user._id } },
         {
@@ -126,17 +123,16 @@ exports.getOrders = catchAsync(async (req, res, next) => {
             }
         }
     ]).skip(skip).limit(limit).sort("-createdAt")
-
-
     res.status(200).json({
         status: "success",
         orders: orderStats,
         isSuccess: true,
         total: orderCodes.length
     });
-
-
 })
+
+// const mongoose = require('mongoose');
+// const { body, validationResult } = require('express-validator');
 
 // cancel order if isn't still checkout within 5 mins
 exports.createOrder = [
@@ -150,19 +146,29 @@ exports.createOrder = [
         if (!user) {
             return next(new AppError("You are not authenticated. Please login", 401));
         }
-
         const { products: productsString } = req.body;
 
-        let products = productsString.split("#").map(id => {
-            const [quantity, productId] = id.split("_");
-            return { id: productId, quantity: Number(quantity) };
-        });
+        // Parse and validate products
+        let products;
+        try {
+            products = productsString.split("#").map(id => {
+                const [quantity, productId] = id.split("_");
+                const parsedQuantity = Number(quantity);
 
-        if (products && !products.length > 0) {
-            return next(new AppError("Please add products id and quantity", 400))
+                if (!productId || isNaN(parsedQuantity) || parsedQuantity <= 0) {
+                    throw new Error("Invalid product format");
+                }
+
+                return { id: productId.trim(), quantity: parsedQuantity };
+            });
+        } catch (error) {
+            next(new AppError("Invalid product format", 400));
         }
 
-        // // Merge duplicate products by summing their quantities
+        if (!products || products.length === 0) {
+            next(new AppError("Please add products id and quantity", 400));
+        }
+
         const productMap = {};
         products.forEach(({ id, quantity }) => {
             if (productMap[id]) {
@@ -174,94 +180,123 @@ exports.createOrder = [
 
         products = Object.entries(productMap).map(([id, quantity]) => ({ id, quantity }));
 
+        // Validate ObjectIds
         const productIds = products.map(p => p.id);
-
         for (const productId of productIds) {
             if (!mongoose.Types.ObjectId.isValid(productId)) {
-                return next(new AppError("Invalid Product Id", 404));
+                return next(new AppError("Invalid Product Id", 400));
             }
         }
 
-        const foundProducts = await Product.find({ _id: { $in: productIds } }).lean();
+        // Start transaction for data consistency
+        const session = await mongoose.startSession();
+        session.startTransaction();
 
-        if (!foundProducts) {
-            return next(new AppError("No products ound.", 400))
-        }
+        try {
+            // Find products with session for consistency
+            const foundProducts = await Product.find({
+                _id: { $in: productIds }
+            }).session(session);
 
-        for (const [index, product] of foundProducts.entries()) {
-            const orderedProduct = products.find(p => p.id === String(product._id));
-
-            if (orderedProduct && product.inventory < orderedProduct.quantity) {
-                return next(new AppError("The product reached limit", 400));
+            if (!foundProducts || foundProducts.length === 0) {
+                return next(new AppError("No products found.", 404));
             }
-            if (orderedProduct) {
-                products[index].merchant = product.merchant;
+
+            if (foundProducts.length !== products.length) {
+                const foundIds = foundProducts.map(p => p._id.toString());
+                const missingIds = productIds.filter(id => !foundIds.includes(id));
+                return next(new AppError(`Products not found: ${missingIds.join(', ')}`, 404));
             }
-        }
 
+            // Check inventory availability (but don't reduce it yet)
+            const orderProducts = [];
 
-        // Prepare bulk update for product inventory
-        const bulkOps = products.map((product) => ({
-            updateOne: {
-                filter: { _id: product.id },
-                update: { $inc: { inventory: -product.quantity } }
+            for (const product of foundProducts) {
+                const orderedProduct = products.find(p => p.id === product._id.toString());
+
+                if (!orderedProduct) {
+                    continue;
+                }
+
+                // ONLY CHECK inventory availability - don't reduce it
+                if (product.inventory < orderedProduct.quantity) {
+                    await session.abortTransaction();
+                    session.endSession();
+                    return next(new AppError(
+                        `Insufficient inventory for product ${product.name || product._id}. Available: ${product.inventory}, Requested: ${orderedProduct.quantity}`,
+                        400
+                    ));
+                }
+
+                orderProducts.push({
+                    id: product._id.toString(),
+                    quantity: orderedProduct.quantity,
+                    merchant: product.merchant,
+                    price: product.price,
+                    name: product.name
+                });
             }
-        }));
 
-        if (bulkOps.length > 0) {
-            await Product.bulkWrite(bulkOps);
-        }
-
-        if (foundProducts.length !== products.length) {
-            return next(new AppError("Products not found", 404));
-        }
-
-        const cart = await Cart.findOne({ userId: user._id });
-
-        if (cart) {
-            await Cart.updateOne(
-                { _id: cart._id, userId: user._id },
-                { $pull: { products: { productId: { $in: productIds } } } }
-            );
-        }
-        const orders = []
-
-        const code = `ORD-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`
-
-        products.forEach((product) => {
-            const order = {
+            // Create orders (without reducing inventory)
+            const code = `ORD-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`;
+            const orders = orderProducts.map((product) => ({
                 code,
                 userId: user._id,
                 productId: product.id,
                 quantity: product.quantity,
                 merchant: product.merchant,
-            }
-            orders.push(order)
-        })
+                price: product.price,
+                status: 'pending',
+                isPaid: false,
+                inventoryReserved: false, // Track reservation status
+                createdAt: new Date()
+            }));
 
-        await Order.insertMany(orders)
+            await Order.insertMany(orders, { session });
 
-        await orderQueue.add(
-            `order:${code}`,
-            { code },
-            { delay: 1000 * 60 * 3, jobId: `order:${code}` } // 5-minute delay 300000
-        );
+            // Add job to queue for order expiration cleanup
+            await orderQueue.add(
+                `order-expiration`,
+                { code },
+                {
+                    delay: 1 * 60 * 1000, // 5 minutes
+                    jobId: `order:${code}`,
+                    removeOnComplete: 100,
+                    removeOnFail: 50
+                }
+            );
+            // Calculate total price
+            const { total, totalDiscount } = await calcTotalPrice(orderProducts);
 
-        const { total, totalDiscount } = await calcTotalPrice(products);
+            // Commit transaction
+            await session.commitTransaction();
+            session.endSession();
 
-        res.status(201).json({
-            status: "success",
-            total,
-            discount: totalDiscount,
-            code,
-            isSuccess: true
-        });
+            res.status(201).json({
+                status: "success",
+                total,
+                discount: totalDiscount,
+                code,
+                orderCount: orders.length,
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
+                isSuccess: true
+            });
+
+        } catch (error) {
+            await session.abortTransaction();
+            session.endSession();
+
+            console.error('Order creation failed:', error);
+            next(new AppError("Failed to create order. Please try again.", 500));
+        }
     }),
 ];
 
-// order cancel
+exports.cashOnDelivery = [
+    body("code", "Order code is required.").notEmpty(),
 
-// checkout
+]
+
 exports.createCheckoutSession = [
     body("code", "Order code is required.").notEmpty(),
     catchAsync(async (req, res, next) => {
@@ -270,85 +305,216 @@ exports.createCheckoutSession = [
             return next(new AppError(errors[0].msg, 400));
         }
 
-        const code = req.body.code;
-
-        const orders = await Order.find({ code, status: "pending" })
-
-        if (!orders.length > 0) {
-            return next(new AppError("Invalid order code.", 400))
-        }
+        const { code } = req.body;
+        const userId = req.userId;
 
 
-        const productIds = orders.map((order) => order.productId)
+        const session = await mongoose.startSession();
+        try {
+            let stripeSession;
+            let orders;
+            let lineItems = [];
+            let totalAmount = 0;
+            let totalShipping = 0;
 
+            await session.withTransaction(async () => {
+                orders = await Order.find({
+                    code,
+                    status: "pending",
+                    userId: userId,
+                    isPaid: false
+                }).session(session);
 
-        const products = await Product.find({ _id: { $in: productIds } }).lean();
+                if (!orders || orders.length === 0) {
+                    throw new AppError("Invalid order code or no pending orders found.", 400);
+                }
+                const orderAge = Date.now() - new Date(orders[0].createdAt).getTime();
+                const fiveMinutes = 5 * 60 * 1000;
+                if (orderAge > fiveMinutes) {
+                    throw new AppError("Order has expired. Please create a new order.", 400);
+                }
+                if (orders[0].inventoryReserved) {
+                    throw new AppError("Inventory already reserved for this order. Please complete payment or create a new order.", 400);
+                }
 
+                const productIds = orders.map(order => order.productId);
 
-        if (!Array.isArray(products) || products.length === 0) {
-            return res.status(400).json({ error: "Invalid or empty products" });
-        }
+                // Find products and validate they exist
+                const products = await Product.find({
+                    _id: { $in: productIds }
+                }).session(session);
 
-        let totalAmount = 0;
+                if (!products || products.length === 0) {
+                    throw new AppError("No valid products found for this order.", 400);
+                }
 
-        const lineItems = products.map((product, index) => {
-            const amount = Math.round(product.price * 100);
-            const shippingFee = product.shipping ? Math.round(product.shipping * 100) : 0;
-            totalAmount += (amount + shippingFee) * orders[index].quantity;
+                // Validate all products exist before proceeding
+                if (products.length !== productIds.length) {
+                    throw new AppError("Some products in the order are no longer available.", 400);
+                }
 
-            return {
-                price_data: {
-                    currency: "mmk",
-                    product_data: {
-                        name: product.name,
-                        images: [product.images[0]]
+                // Create a map for efficient product lookup
+                const productMap = {};
+                products.forEach(product => {
+                    productMap[product._id.toString()] = product;
+                });
+
+                // Validate inventory and reserve it atomically
+                for (const order of orders) {
+                    const product = productMap[order.productId.toString()];
+
+                    if (!product) {
+                        throw new AppError(`Product not found for order item: ${order.productId}`, 400);
+                    }
+
+                    // Validate product has required fields
+                    if (!product.name || !product.images || product.images.length === 0) {
+                        throw new AppError(`Product ${product.name || product._id} is missing required information`, 400);
+                    }
+
+                    // Check inventory before attempting to reserve
+                    if (product.inventory < order.quantity) {
+                        throw new AppError(
+                            `Insufficient inventory for ${product.name}. Available: ${product.inventory}, Required: ${order.quantity}`,
+                            400
+                        );
+                    }
+
+                    // ATOMIC INVENTORY CHECK AND RESERVATION
+                    const updateResult = await Product.updateOne(
+                        {
+                            _id: product._id,
+                            inventory: { $gte: order.quantity } // Only update if sufficient inventory
+                        },
+                        {
+                            $inc: {
+                                inventory: -order.quantity,
+                                reservedInventory: order.quantity // Track reserved items
+                            }
+                        },
+                        { session }
+                    );
+
+                    // If no document was modified, insufficient inventory (race condition)
+                    if (updateResult.modifiedCount === 0) {
+                        throw new AppError(
+                            `Insufficient inventory for ${product.name}. Please try again.`,
+                            400
+                        );
+                    }
+
+                    // Calculate amounts in cents for Stripe
+                    const unitPrice = Math.round(product.price * 100);
+                    const shippingFee = product.shipping ? Math.round(product.shipping * 100) : 0;
+                    const totalUnitAmount = unitPrice + shippingFee;
+                    const lineTotal = totalUnitAmount * order.quantity;
+
+                    totalAmount += lineTotal;
+                    totalShipping += (shippingFee * order.quantity);
+
+                    lineItems.push({
+                        price_data: {
+                            currency: "mmk",
+                            product_data: {
+                                name: product.name,
+                                images: [product.images[0]],
+                            },
+                            unit_amount: totalUnitAmount,
+                        },
+                        quantity: order.quantity,
+                    });
+                }
+
+                // Update orders to mark inventory as reserved
+                await Order.updateMany(
+                    { code },
+                    {
+                        $set: {
+                            inventoryReserved: true,
+                            reservedAt: new Date()
+                        }
                     },
-                    unit_amount: amount + shippingFee,
+                    { session }
+                );
+
+                // Minimum amount validation (Stripe requirement)
+                if (totalAmount < 1000) {
+                    throw new AppError("Order amount is too small for payment processing.", 400);
+                }
+            });
+
+            // Create Stripe checkout session (outside transaction to avoid blocking)
+            stripeSession = await stripe.checkout.sessions.create({
+                payment_method_types: ["card"],
+                line_items: lineItems,
+                mode: "payment",
+                success_url: `${process.env.FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.FRONTEND_URL}/payment-cancel?order_code=${code}`,
+                expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // 30 minutes expiry
+                metadata: {
+                    userId: userId.toString(),
+                    orderCode: code,
+                    totalShipping: (totalShipping / 100).toString(),
+                    totalAmount: (totalAmount / 100).toString(),
+                    orderCount: orders.length.toString(),
                 },
-                quantity: orders[index].quantity || 1,
-            };
-        });
+                customer_email: req.user.email,
+                billing_address_collection: 'required',
+                shipping_address_collection: {
+                    allowed_countries: ['MM'],
+                },
+            });
 
-        // let coupon = null;
-        // if (couponCode) {
-        //     coupon = await Coupon.findOne({ code: couponCode, userId: req.user._id, isActive: true });
-        //     if (coupon) {
-        //         totalAmount -= Math.round((totalAmount * coupon.discountPercentage) / 100);
-        //     }
-        // }
+            // Store session ID for tracking (separate transaction to avoid conflicts)
+            await Order.updateMany(
+                { code },
+                {
+                    $set: {
+                        stripeSessionId: stripeSession.id,
+                        sessionCreatedAt: new Date()
+                    }
+                }
+            );
 
-        // Calculate total shipping fee
-        const totalShipping = products.reduce((sum, product, idx) => {
-            const quantity = orders[idx].quantity || 1;
-            return sum + ((product.shipping || 0) * quantity);
-        }, 0);
-
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ["card"],
-            line_items: lineItems,
-            mode: "payment",
-            success_url: `${process.env.FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.FRONTEND_URL}/payment-cancel`,
-            metadata: {
-                userId: req.user._id.toString(),
-                orderCode: code,
+            res.status(200).json({
+                status: "success",
+                sessionId: stripeSession.id,
+                url: stripeSession.url,
+                totalAmount: totalAmount,
                 totalShipping: totalShipping,
-                totalAmount: totalAmount
-            },
-        });
+                currency: "MMK",
+                orderCode: code,
+                expiresAt: new Date((Math.floor(Date.now() / 1000) + (30 * 60)) * 1000),
+                itemCount: orders.length,
+                isSuccess: true
+            });
 
-        // Add shipping fee to response
-        res.status(200).json({
-            status: "success",
-            id: session.id,
-            totalAmount: totalAmount / 100,
-            shipping: totalShipping,
-            url: session.url,
-            isSuccess: true
-        });
+        } catch (error) {
 
+            if (error instanceof AppError) {
+                return next(error);
+            }
+
+            console.error('Checkout session creation failed:', error);
+
+            // Handle specific Stripe errors
+            if (error.type === 'StripeCardError') {
+                return next(new AppError('Payment processing error. Please try again.', 400));
+            } else if (error.type === 'StripeInvalidRequestError') {
+                return next(new AppError('Invalid payment request. Please check your order details.', 400));
+            } else if (error.type === 'StripeConnectionError') {
+                return next(new AppError('Payment service connection error. Please try again.', 503));
+            } else if (error.type === 'StripeAPIError') {
+                return next(new AppError('Payment service error. Please try again later.', 503));
+            } else {
+                return next(new AppError('Payment service unavailable. Please try again later.', 503));
+            }
+        } finally {
+            await session.endSession();
+        }
     }),
 ];
+
 
 exports.checkoutSuccess = [
     body("sessionId", "Invalid Session Id").notEmpty(),
@@ -357,117 +523,316 @@ exports.checkoutSuccess = [
         if (errors.length) {
             return next(new AppError(errors[0].msg, 400));
         }
+
         const { sessionId } = req.body;
+
+        // Retrieve session details
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-        if (session.payment_status !== "paid") {
-            return next(new AppError("Payment not completed", 400))
-        }
         if (!session) {
-            return next(new AppError("Session not found!", 400))
+            return next(new AppError("Session not found!", 400));
         }
-        const orderCode = session.metadata.orderCode;
-        const totalAmount = session.metadata.totalAmount;
-        const orders = await Order.find({ code: orderCode })
 
-        // Handle concurrency: restore inventory for cancelled orders, and ensure atomicity
-        const restoreOps = [];
-        for (const order of orders) {
-            if (order.status === "cancel") {
-                // Find the quantity for this order
-                const quantity = order.quantity;
-                restoreOps.push({
-                    updateOne: {
-                        filter: { _id: order.productId },
-                        update: { $inc: { inventory: -quantity } }
+        if (session.payment_status !== "paid") {
+            return next(new AppError("Payment not completed", 400));
+        }
+
+        const orderCode = session.metadata.orderCode;
+        const userId = session.metadata.userId;
+
+        // Find orders
+        const orders = await Order.find({
+            code: orderCode,
+            userId: userId
+        });
+
+        if (!orders || orders.length === 0) {
+            return next(new AppError("Invalid order code", 400));
+        }
+
+        // Check if already processed to prevent duplicate processing
+        if (orders[0].isPaid) {
+            return res.status(200).json({
+                status: "success",
+                isSuccess: true,
+                orderCode,
+                totalAmount: session.metadata.totalAmount,
+                message: "Order already processed"
+            });
+        }
+
+        // Start transaction for atomic processing
+        const mongoSession = await mongoose.startSession();
+
+        try {
+            let shouldRefund = false;
+            let refundReason = [];
+
+            await mongoSession.withTransaction(async () => {
+                // Get product IDs for inventory checking
+                const productIds = orders.map(order => order.productId);
+                const products = await Product.find({
+                    _id: { $in: productIds }
+                }).session(mongoSession);
+
+                // Create product lookup map
+                const productMap = {};
+                products.forEach(product => {
+                    productMap[product._id.toString()] = product;
+                });
+
+                // Check if inventory was already reserved during checkout
+                const hasReservedInventory = orders[0].inventoryReserved;
+
+                if (hasReservedInventory) {
+                    // Inventory was reserved - just convert to sold
+                    const inventoryOps = [];
+                    const merchantTotals = {};
+
+                    for (const order of orders) {
+                        const product = productMap[order.productId.toString()];
+                        if (!product) continue;
+
+                        // Convert reserved inventory to sold
+                        inventoryOps.push({
+                            updateOne: {
+                                filter: { _id: order.productId },
+                                update: {
+                                    $inc: {
+                                        reservedInventory: -order.quantity,
+                                        soldCount: order.quantity
+                                    }
+                                }
+                            }
+                        });
+
+                        // Calculate merchant earnings
+                        if (product.merchant) {
+                            if (!merchantTotals[product.merchant]) {
+                                merchantTotals[product.merchant] = 0;
+                            }
+                            merchantTotals[product.merchant] += order.quantity * product.price;
+                        }
                     }
+
+                    // Execute inventory updates
+                    if (inventoryOps.length > 0) {
+                        await Product.bulkWrite(inventoryOps, { session: mongoSession });
+                    }
+
+                    // Update merchant balances
+                    await updateMerchantBalances(merchantTotals, mongoSession);
+
+                } else {
+                    // No reservation - need to check and deduct inventory atomically
+                    const inventoryOps = [];
+                    const merchantTotals = {};
+
+                    for (const order of orders) {
+                        const product = productMap[order.productId.toString()];
+                        if (!product) {
+                            shouldRefund = true;
+                            refundReason.push(`Product ${order.productId} not found`);
+                            continue;
+                        }
+
+                        // Atomic inventory check and deduction
+                        const updateResult = await Product.updateOne(
+                            {
+                                _id: order.productId,
+                                inventory: { $gte: order.quantity } // Only update if sufficient inventory
+                            },
+                            {
+                                $inc: {
+                                    inventory: -order.quantity,
+                                    soldCount: order.quantity
+                                }
+                            },
+                            { session: mongoSession }
+                        );
+
+                        // If no document was modified, insufficient inventory
+                        if (updateResult.modifiedCount === 0) {
+                            shouldRefund = true;
+                            refundReason.push(`${product.name} - insufficient inventory`);
+                            continue;
+                        }
+
+                        // Calculate merchant earnings for successful orders
+                        if (product.merchant) {
+                            if (!merchantTotals[product.merchant]) {
+                                merchantTotals[product.merchant] = 0;
+                            }
+                            merchantTotals[product.merchant] += order.quantity * product.price;
+                        }
+                    }
+
+                    // Update merchant balances only for successful orders
+                    if (!shouldRefund) {
+                        await updateMerchantBalances(merchantTotals, mongoSession);
+                    }
+                }
+
+                // Update orders based on success/failure
+                const orderUpdateData = {
+                    stripeSessionId: sessionId,
+                    payment: "stripe",
+                    processedAt: new Date()
+                };
+
+                if (shouldRefund) {
+                    orderUpdateData.status = "refund";
+                    orderUpdateData.refundReason = refundReason.join(', ');
+                } else {
+                    orderUpdateData.isPaid = true;
+                    orderUpdateData.status = "confirmed";
+                    orderUpdateData.paidAt = new Date();
+                }
+
+                await Order.updateMany(
+                    { code: orderCode },
+                    { $set: orderUpdateData },
+                    { session: mongoSession }
+                );
+
+                // Update product status for zero inventory items (only if not refunding)
+                if (!shouldRefund) {
+                    await updateZeroInventoryProducts(productIds, mongoSession);
+                }
+            });
+
+            // Handle refund outside transaction if needed
+            if (shouldRefund) {
+                await processRefund(session, orderCode, refundReason);
+
+                return res.status(200).json({
+                    status: "success",
+                    isSuccess: false,
+                    orderCode,
+                    message: "Order refunded due to insufficient inventory",
+                    refundReason: refundReason.join(', ')
                 });
             }
+
+        } catch (error) {
+            console.error('Checkout processing failed:', error);
+            return next(new AppError("Checkout processing failed", 500));
+        } finally {
+            await mongoSession.endSession();
         }
 
-        if (restoreOps.length > 0) {
-            await Product.bulkWrite(restoreOps);
+        // Remove order from expiration queue (successful payment)
+        try {
+            await orderQueue.remove(`order:${orderCode}`);
+        } catch (queueError) {
+            console.error('Failed to remove order from queue:', queueError);
         }
 
-        if (!orders.length > 0) {
-            return next(new AppError("Invalid order code", 400))
-        }
-
-        const productIds = orders.map((order) => order.productId)
-
-        const products = await Product.find({ _id: { $in: productIds } }).lean();
-
-        if (products && products.length > 0) {
-            // Use bulkWrite for efficient, atomic updates to handle high concurrency
-            const merchantOps = [];
-            for (const product of products) {
-                if (product.merchant && product.price && product.quantity) {
-                    merchantOps.push({
-                        updateOne: {
-                            filter: { _id: product.merchant },
-                            update: { $inc: { balance: (totalAmount) } }
-                        }
-                    });
-                }
-            }
-            if (merchantOps.length > 0) {
-                await Seller.bulkWrite(merchantOps);
-            }
-        }
-
-        if (!Array.isArray(orders) || orders.length === 0) {
-            return res.status(400).json({ error: "Invalid or empty orders" });
-        }
-
-        // Update orders in bulk for performance
-        await Order.updateMany(
-            { code: orderCode },
-            {
-                $set: {
-                    stripeSessionId: sessionId,
-                    isPaid: true,
-                    status: "pending",
-                    payment: "stripe"
-                }
-            }
-        );
-        // Prepare bulk update for product inventory
-        // const bulkOps = products.map((product) => ({
-        //     updateOne: {
-        //         filter: { _id: product.id },
-        //         update: { $inc: { inventory: -product.quantity } }
-        //     }
-        // }));
-
-        // if (bulkOps.length > 0) {
-        //     await Product.bulkWrite(bulkOps);
-        // }
-
-        // remove orderqueue from redis 
-
-        const email = await getEmailContent({ filename: "orderSuccess.html", data: {} })
-
-        emailQueue.add(
-            "email-user",
-            {
-                receiver: "tuntunmyint10182003@gmail.com",
-                subject: "Ayeyar Market Orders Detail",
-                html: email,
-            },
-            { removeOnComplete: true, removeOnFail: 1000 }
-        );
-
-        await orderQueue.remove(`order:${orderCode}`);
-
-        // TODO: Add notification to merchant (implement as needed, e.g., queue)
+        // Send success email
+        await sendOrderConfirmationEmail(orders[0].userId, orderCode);
 
         res.status(200).json({
             status: "success",
             isSuccess: true,
             orderCode,
-            totalAmount
+            totalAmount: session.metadata.totalAmount
         });
-
     }),
 ];
 
+// Helper function to update merchant balances
+async function updateMerchantBalances(merchantTotals, mongoSession) {
+    if (Object.keys(merchantTotals).length === 0) return;
+
+    const merchantOps = Object.entries(merchantTotals).map(([merchantId, amount]) => ({
+        updateOne: {
+            filter: { _id: merchantId },
+            update: { $inc: { balance: amount } }
+        }
+    }));
+
+    await Seller.bulkWrite(merchantOps, { session: mongoSession });
+}
+
+// Helper function to update zero inventory products
+async function updateZeroInventoryProducts(productIds, mongoSession) {
+    const zeroInventoryProducts = await Product.find({
+        _id: { $in: productIds },
+        inventory: { $lte: 0 }
+    }).session(mongoSession);
+
+    if (zeroInventoryProducts.length > 0) {
+        const statusUpdateOps = zeroInventoryProducts.map(product => ({
+            updateOne: {
+                filter: { _id: product._id },
+                update: { $set: { status: 'out_of_stock' } }
+            }
+        }));
+
+        await Product.bulkWrite(statusUpdateOps, { session: mongoSession });
+    }
+}
+
+// Helper function to process refunds
+async function processRefund(session, orderCode, refundReason) {
+    try {
+        const refund = await stripe.refunds.create({
+            payment_intent: session.payment_intent,
+            reason: 'requested_by_customer',
+            metadata: {
+                orderCode: orderCode,
+                reason: 'insufficient_inventory'
+            }
+        });
+
+        // Update orders with refund information
+        await Order.updateMany(
+            { code: orderCode },
+            {
+                $set: {
+                    status: 'refunded',
+                    stripeRefundId: refund.id,
+                    refundedAt: new Date()
+                }
+            }
+        );
+
+        console.log(`Order ${orderCode} refunded: ${refundReason.join(', ')}`);
+
+    } catch (refundError) {
+        console.error('Refund processing failed:', refundError);
+
+        // Mark refund as failed for manual processing
+        await Order.updateMany(
+            { code: orderCode },
+            {
+                $set: {
+                    status: 'refund_failed',
+                    refundError: refundError.message
+                }
+            }
+        );
+    }
+}
+
+// Helper function to send confirmation email
+async function sendOrderConfirmationEmail(userId, orderCode) {
+    try {
+        const email = await getEmailContent({
+            filename: "orderSuccess.html",
+            data: { orderCode }
+        });
+
+        await emailQueue.add(
+            "email-user",
+            {
+                receiver: "tuntunmyint10182003@gmail.com", // Make this dynamic
+                subject: "Ayeyar Market Order Confirmation",
+                html: email,
+            },
+            { removeOnComplete: true, removeOnFail: 1000 }
+        );
+    } catch (emailError) {
+        console.error('Failed to send confirmation email:', emailError);
+    }
+}
