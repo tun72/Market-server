@@ -256,7 +256,7 @@ exports.createOrder = [
                 `order-expiration`,
                 { code },
                 {
-                    delay: 1 * 60 * 1000, // 5 minutes
+                    delay: 5 * 60 * 1000, // 5 minutes
                     jobId: `order:${code}`,
                     removeOnComplete: 100,
                     removeOnFail: 50
@@ -289,20 +289,20 @@ exports.createOrder = [
     }),
 ];
 
+
 exports.createCheckoutSession = [
     body("code", "Order code is required.").notEmpty(),
-    body("payment", "Payment type is required").notEmpty(),
     catchAsync(async (req, res, next) => {
         const errors = validationResult(req).array({ onlyFirstError: true });
         if (errors.length) {
             return next(new AppError(errors[0].msg, 400));
         }
 
-        const { code, payment } = req.body;
+        const { code } = req.body;
         const userId = req.userId;
 
-
         const session = await mongoose.startSession();
+
         try {
             let stripeSession;
             let orders;
@@ -310,93 +310,115 @@ exports.createCheckoutSession = [
             let totalAmount = 0;
             let totalShipping = 0;
 
+
+            orders = await Order.find({
+                code,
+                status: "pending",
+                userId: userId,
+                isPaid: false
+            }).session(session).lean();
+
+            if (!orders?.length) {
+                throw new AppError("Invalid order code or no pending orders found.", 400);
+            }
+
+
+            const ORDER_EXPIRY_MINUTES = 5;
+            const PAYMENT_EXPIRY_MINUTES = 30;
+            const MIN_PAYMENT_AMOUNT = 1000; // cents
+
+            const orderAge = Date.now() - new Date(orders[0].createdAt).getTime();
+            const expiryTime = ORDER_EXPIRY_MINUTES * 60 * 1000;
+
+            if (orderAge > expiryTime) {
+                throw new AppError("Order has expired. Please create a new order.", 400);
+            }
+
+            if (orders[0].inventoryReserved && orders[0].stripeSessionId) {
+                try {
+                    stripeSession = await stripe.checkout.sessions.retrieve(orders[0].stripeSessionId);
+
+                    // Check if session is still valid
+                    if (stripeSession.status === 'open') {
+                        return res.status(200).json({
+                            status: "success",
+                            sessionId: stripeSession.id,
+                            url: stripeSession.url,
+                            currency: "MMK",
+                            orderCode: code,
+                            expiresAt: new Date((stripeSession.expires_at) * 1000),
+                            isSuccess: true,
+                            message: "Existing checkout session retrieved"
+                        });
+                    }
+                } catch (stripeError) {
+                    // If session retrieval fails, proceed to create new session
+                    console.warn(`Failed to retrieve Stripe session: ${stripeError.message}`);
+                }
+            }
+
             await session.withTransaction(async () => {
-                orders = await Order.find({
-                    code,
-                    status: "pending",
-                    userId: userId,
-                    isPaid: false
-                }).session(session);
-
-                if (!orders || orders.length === 0) {
-                    throw new AppError("Invalid order code or no pending orders found.", 400);
-                }
-                const orderAge = Date.now() - new Date(orders[0].createdAt).getTime();
-                const fiveMinutes = 5 * 60 * 1000;
-                if (orderAge > fiveMinutes) {
-                    throw new AppError("Order has expired. Please create a new order.", 400);
-                }
-                if (orders[0].inventoryReserved) {
-                    throw new AppError("Inventory already reserved for this order. Please complete payment or create a new order.", 400);
-                }
-
                 const productIds = orders.map(order => order.productId);
-
-                // Find products and validate they exist
                 const products = await Product.find({
                     _id: { $in: productIds }
-                }).session(session);
-
-                if (!products || products.length === 0) {
+                }).select('name images price shipping inventory reservedInventory')
+                    .session(session)
+                    .lean();
+                if (!products?.length) {
                     throw new AppError("No valid products found for this order.", 400);
                 }
-
-                // Validate all products exist before proceeding
                 if (products.length !== productIds.length) {
                     throw new AppError("Some products in the order are no longer available.", 400);
                 }
+                // Create product map for efficient lookup
+                const productMap = new Map(
+                    products.map(product => [product._id.toString(), product])
+                );
+                // Process orders and validate inventory
+                const inventoryUpdates = [];
 
-                // Create a map for efficient product lookup
-                const productMap = {};
-                products.forEach(product => {
-                    productMap[product._id.toString()] = product;
-                });
-
-                // Validate inventory and reserve it atomically
                 for (const order of orders) {
-                    const product = productMap[order.productId.toString()];
+                    const product = productMap.get(order.productId.toString());
 
                     if (!product) {
                         throw new AppError(`Product not found for order item: ${order.productId}`, 400);
                     }
 
-                    // Validate product has required fields
-                    if (!product.name || !product.images || product.images.length === 0) {
+                    // Enhanced product validation
+                    if (!product.name?.trim() || !Array.isArray(product.images) || !product.images.length) {
                         throw new AppError(`Product ${product.name || product._id} is missing required information`, 400);
                     }
 
-                    // Check inventory before attempting to reserve
-                    if (product.inventory < order.quantity) {
+                    if (typeof product.price !== 'number' || product.price <= 0) {
+                        throw new AppError(`Product ${product.name} has invalid price`, 400);
+                    }
+
+                    // Check available inventory (considering already reserved)
+                    const availableInventory = product.inventory || 0;
+                    if (availableInventory < order.quantity) {
                         throw new AppError(
-                            `Insufficient inventory for ${product.name}. Available: ${product.inventory}, Required: ${order.quantity}`,
+                            `Insufficient inventory for ${product.name}. Available: ${availableInventory}, Required: ${order.quantity}`,
                             400
                         );
                     }
 
-                    // ATOMIC INVENTORY CHECK AND RESERVATION
-                    const updateResult = await Product.updateOne(
-                        {
-                            _id: product._id,
-                            inventory: { $gte: order.quantity } // Only update if sufficient inventory
-                        },
-                        {
-                            $inc: {
-                                inventory: -order.quantity,
-                                reservedInventory: order.quantity // Track reserved items
+                    // Prepare inventory update
+                    inventoryUpdates.push({
+                        updateOne: {
+                            filter: {
+                                _id: product._id,
+                                inventory: { $gte: order.quantity }
+                            },
+                            update: {
+                                $inc: {
+                                    inventory: -order.quantity,
+                                    reservedInventory: order.quantity
+                                }
                             }
-                        },
-                        { session }
-                    );
+                        }
+                    });
 
-                    // If no document was modified, insufficient inventory (race condition)
-                    if (updateResult.modifiedCount === 0) {
-                        throw new AppError(
-                            `Insufficient inventory for ${product.name}. Please try again.`,
-                            400
-                        );
-                    }
-
-                    // Calculate amounts in cents for Stripe
+                    // Calculate pricing (improved precision handling)
                     const unitPrice = Math.round(product.price * 100);
                     const shippingFee = product.shipping ? Math.round(product.shipping * 100) : 0;
                     const totalUnitAmount = unitPrice + shippingFee;
@@ -405,12 +427,16 @@ exports.createCheckoutSession = [
                     totalAmount += lineTotal;
                     totalShipping += (shippingFee * order.quantity);
 
+                    // Build line items for Stripe
                     lineItems.push({
                         price_data: {
                             currency: "mmk",
                             product_data: {
                                 name: product.name,
-                                images: [product.images[0]],
+                                images: product.images.slice(0, 1), // Stripe accepts max 8 images, use first one
+                                metadata: {
+                                    productId: product._id.toString()
+                                }
                             },
                             unit_amount: totalUnitAmount,
                         },
@@ -418,9 +444,25 @@ exports.createCheckoutSession = [
                     });
                 }
 
+                // Validate minimum payment amount
+                if (totalAmount < MIN_PAYMENT_AMOUNT) {
+                    throw new AppError(`Order amount (${totalAmount / 100} MMK) is below minimum required (${MIN_PAYMENT_AMOUNT / 100} MMK).`, 400);
+                }
+
+                // Execute atomic inventory updates using bulkWrite
+                const inventoryResults = await Product.bulkWrite(inventoryUpdates, {
+                    session,
+                    ordered: true // Stop on first failure
+                });
+
+                // Verify all inventory updates succeeded
+                if (inventoryResults.modifiedCount !== inventoryUpdates.length) {
+                    throw new AppError("Unable to reserve inventory. Some items may no longer be available.", 400);
+                }
+
                 // Update orders to mark inventory as reserved
-                await Order.updateMany(
-                    { code },
+                const orderUpdateResult = await Order.updateMany(
+                    { code, userId: userId }, // Add userId for security
                     {
                         $set: {
                             inventoryReserved: true,
@@ -430,45 +472,55 @@ exports.createCheckoutSession = [
                     { session }
                 );
 
-                // Minimum amount validation (Stripe requirement)
-                if (totalAmount < 1000) {
-                    throw new AppError("Order amount is too small for payment processing.", 400);
+                if (orderUpdateResult.modifiedCount === 0) {
+                    throw new AppError("Failed to update order status", 500);
                 }
             });
 
-            // Create Stripe checkout session (outside transaction to avoid blocking)
+            // Create Stripe checkout session (outside transaction)
+            const expiresAt = Math.floor(Date.now() / 1000) + (30 * 60);
+
             stripeSession = await stripe.checkout.sessions.create({
                 payment_method_types: ["card"],
                 line_items: lineItems,
                 mode: "payment",
                 success_url: `${process.env.FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${process.env.FRONTEND_URL}/payment-cancel?order_code=${code}`,
-                expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // 30 minutes expiry
+                expires_at: expiresAt,
                 metadata: {
                     userId: userId.toString(),
                     orderCode: code,
-                    totalShipping: (totalShipping / 100).toString(),
-                    totalAmount: (totalAmount / 100).toString(),
+                    totalShipping: (totalShipping / 100).toFixed(2),
+                    totalAmount: (totalAmount / 100).toFixed(2),
                     orderCount: orders.length.toString(),
+                    createdAt: new Date().toISOString()
                 },
-                customer_email: req.user.email,
+                customer_email: req.user?.email,
                 billing_address_collection: 'required',
                 shipping_address_collection: {
                     allowed_countries: ['MM'],
                 },
+                payment_intent_data: {
+                    metadata: {
+                        orderCode: code,
+                        userId: userId.toString()
+                    }
+                }
             });
 
-            // Store session ID for tracking (separate transaction to avoid conflicts)
+            // Store session ID (separate operation to avoid transaction conflicts)
             await Order.updateMany(
-                { code },
+                { code, userId: userId },
                 {
                     $set: {
                         stripeSessionId: stripeSession.id,
-                        sessionCreatedAt: new Date()
+                        sessionCreatedAt: new Date(),
+                        sessionExpiresAt: new Date(expiresAt * 1000)
                     }
                 }
             );
 
+            // Return success response
             res.status(200).json({
                 status: "success",
                 sessionId: stripeSession.id,
@@ -477,33 +529,128 @@ exports.createCheckoutSession = [
                 totalShipping: totalShipping,
                 currency: "MMK",
                 orderCode: code,
-                expiresAt: new Date((Math.floor(Date.now() / 1000) + (30 * 60)) * 1000),
+                expiresAt: new Date(expiresAt * 1000),
                 itemCount: orders.length,
                 isSuccess: true
             });
 
         } catch (error) {
+            // Enhanced error handling
+            console.error('Checkout session creation error:', {
+                error: error.message,
+                code: error.code,
+                type: error.type,
+                orderCode: req.body.code,
+                userId: userId
+            });
 
             if (error instanceof AppError) {
                 return next(error);
             }
-            // Handle specific Stripe errors
-            if (error.type === 'StripeCardError') {
-                return next(new AppError('Payment processing error. Please try again.', 400));
-            } else if (error.type === 'StripeInvalidRequestError') {
-                return next(new AppError('Invalid payment request. Please check your order details.', 400));
-            } else if (error.type === 'StripeConnectionError') {
-                return next(new AppError('Payment service connection error. Please try again.', 503));
-            } else if (error.type === 'StripeAPIError') {
-                return next(new AppError('Payment service error. Please try again later.', 503));
-            } else {
-                return next(new AppError('Payment service unavailable. Please try again later.', 503));
+
+            // Handle Stripe-specific errors with more granular responses
+            switch (error.type) {
+                case 'StripeCardError':
+                    return next(new AppError('Payment processing error. Please check your card details.', 400));
+                case 'StripeInvalidRequestError':
+                    return next(new AppError('Invalid payment request. Please verify your order details.', 400));
+                case 'StripeConnectionError':
+                    return next(new AppError('Payment service temporarily unavailable. Please try again.', 503));
+                case 'StripeAPIError':
+                case 'StripeAuthenticationError':
+                case 'StripePermissionError':
+                    return next(new AppError('Payment service error. Please try again later.', 503));
+                case 'StripeRateLimitError':
+                    return next(new AppError('Too many requests. Please wait a moment and try again.', 429));
+                default:
+                    return next(new AppError('An unexpected error occurred. Please try again.', 500));
             }
         } finally {
             await session.endSession();
         }
     }),
 ];
+
+exports.cashOnDelivery = [
+    body("code", "Order code is required.").notEmpty(),
+    catchAsync(async (req, res, next) => {
+        const errors = validationResult(req).array({ onlyFirstError: true });
+        if (errors.length) {
+            return next(new AppError(errors[0].msg, 400));
+        }
+
+        const userId = req.userId
+
+        const { code } = req.body
+
+        const orders = await Order.find({
+            code,
+            status: "pending",
+            userId: userId,
+            isPaid: false,
+            status: "unpaid"
+        })
+
+        if (!orders || orders.length === 0) {
+            throw new AppError("Invalid order code or no pending orders found.", 400);
+        }
+        const orderAge = Date.now() - new Date(orders[0].createdAt).getTime();
+        const fiveMinutes = 5 * 60 * 1000;
+        if (orderAge > fiveMinutes) {
+            throw new AppError("Order has expired. Please create a new order.", 400);
+        }
+
+        const productIds = orders.map(order => order.productId);
+
+        const products = await Product.find({
+            _id: { $in: productIds }
+        })
+
+        if (!products || products.length === 0) {
+            throw new AppError("No valid products found for this order.", 400);
+        }
+
+
+        if (products.length !== productIds.length) {
+            throw new AppError("Some products in the order are no longer available.", 400);
+        }
+
+        const productMap = {};
+        products.forEach(product => {
+            productMap[product._id.toString()] = product;
+        });
+
+
+        for (const order of orders) {
+            const product = productMap[order.productId.toString()];
+
+            if (!product) {
+                throw new AppError(`Product not found for order item: ${order.productId}`, 400);
+            }
+
+            // Validate product has required fields
+            if (!product.name || !product.images || product.images.length === 0) {
+                throw new AppError(`Product ${product.name || product._id} is missing required information`, 400);
+            }
+
+            // Check inventory before attempting to reserve
+            if (product.inventory < order.quantity) {
+                throw new AppError(
+                    `Insufficient inventory for ${product.name}. Available: ${product.inventory}, Required: ${order.quantity}`,
+                    400
+                );
+            }
+        }
+
+        await orderQueue.remove(`order:${code}`);
+        await Order.updateMany({ code }, { status: "pending", payment: "cod" })
+
+        res.status(200).json({ message: "Cash on delivery success. Please wait for merchant confirm.", isSuccess: true, })
+
+    })
+]
+
+
 
 exports.checkoutSuccess = [
     body("sessionId", "Invalid Session Id").notEmpty(),

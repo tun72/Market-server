@@ -122,7 +122,6 @@ const productSchema = new Schema({
         ref: 'User',
         required: [true, 'Merchant reference is required'],
     },
-
     reservedInventory: { type: Number, default: 0 },
     soldCount: { type: Number, default: 0 },
 }, {

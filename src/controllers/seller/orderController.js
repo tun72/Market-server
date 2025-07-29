@@ -4,7 +4,8 @@ const Seller = require("../../models/sellerModel");
 const AppError = require("../../utils/appError");
 const catchAsync = require("../../utils/catchAsync");
 const factory = require("../handlerFactory");
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
+const { Product } = require("../../models/productModel");
 
 exports.getAllOrders = [
     catchAsync(async (req, res, next) => {
@@ -44,7 +45,7 @@ exports.updateOrders = [
         const { orderId, status } = req.body;
 
         // Find order with additional details
-        const order = await Order.findById(orderId).populate('items.product');
+        const order = await Order.findById(orderId).populate('productId.product');
         if (!order) {
             return next(new AppError("No order found with that Id.", 404));
         }
@@ -79,7 +80,6 @@ exports.updateOrders = [
                     {
                         status: status,
                         updatedAt: new Date(),
-                        [`statusHistory.${status}`]: new Date()
                     },
                     { new: true, session }
                 );
@@ -122,13 +122,11 @@ exports.updateOrders = [
 // Helper functions for status-specific logic
 async function handleOrderConfirmation(order, session) {
     // Reserve inventory
-    for (const item of order.items) {
-        await Product.findByIdAndUpdate(
-            item.product._id,
-            { $inc: { stock: -item.quantity, reserved: item.quantity } },
-            { session }
-        );
-    }
+    await Product.findByIdAndUpdate(
+        order.productId,
+        { $inc: { inventory: -item.quantity, reserved: item.quantity } },
+        { session }
+    );
 
     // Process payment if not already done
     if (!order.paymentProcessed) {
