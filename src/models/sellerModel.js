@@ -3,6 +3,7 @@ const path = require("path");
 const fileDelete = require("../utils/fileDelete");
 const User = require("./userModel");
 const bcrypt = require("bcryptjs");
+const { selectFields } = require("express-validator/lib/field-selection");
 
 
 
@@ -48,6 +49,7 @@ const sellerSchema = new mongoose.Schema({
         type: Number,
         default: 0,
         min: [0, "Balance cannot be negative"],
+        select: false
     },
     rating: {
         type: Number,

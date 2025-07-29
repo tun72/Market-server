@@ -9,7 +9,7 @@ exports.getAll = ({ Model, fields = [] }) =>
         const page = req.query.page * 1 || 1;
         const filteredQuery = new ApiFeature(Model.find(filter), req.query).filter();
         const length = await filteredQuery.query.countDocuments();
-        const limit = req.query.limit * 1 || length;
+        const limit = req.query.limit * 1 || 100;
 
 
         const feature = new ApiFeature(Model.find(filter), req.query)
