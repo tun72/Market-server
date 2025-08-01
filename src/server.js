@@ -20,7 +20,7 @@ app.use(express.json()).use(cookieParser());
 app.use(express.static("public"));
 app.use(express.static("uploads"));
 
-let whitelist = ["http://localhost:5173"]
+let whitelist = ["http://localhost:5173", "http://localhost:5174"]
 const corsOptions = {
   origin: function (
     origin,

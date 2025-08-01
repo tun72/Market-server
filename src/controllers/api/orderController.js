@@ -588,7 +588,6 @@ exports.cashOnDelivery = [
             status: "pending",
             userId: userId,
             isPaid: false,
-            status: "unpaid"
         })
 
         if (!orders || orders.length === 0) {
@@ -643,7 +642,7 @@ exports.cashOnDelivery = [
         }
 
         await orderQueue.remove(`order:${code}`);
-        await Order.updateMany({ code }, { status: "pending", payment: "cod" })
+        await Order.updateMany({ code }, { status: "processing", payment: "cod" })
 
         res.status(200).json({ message: "Cash on delivery success. Please wait for merchant confirm.", isSuccess: true, })
 

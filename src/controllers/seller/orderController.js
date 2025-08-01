@@ -29,7 +29,7 @@ exports.updateOrders = [
         return mongoose.Types.ObjectId.isValid(id);
     }),
     body("status", "Status is required").notEmpty().custom((value) => {
-        const all_status = ["pending", "confirmed", "cancelled", "processing", "shipped", "delivered", "completed", "refunded"];
+        const all_status = ["pending", "processing", "confirm", "cancel", "delivery", "success", "expired"];
         if (!all_status.includes(value)) {
             throw new Error("Invalid status. Allowed: " + all_status.join(", "));
         }
@@ -52,15 +52,14 @@ exports.updateOrders = [
 
         // Validate status transition
         const validTransitions = {
-            'pending': ['confirmed', 'cancelled'],
-            'confirmed': ['processing', 'cancelled'],
-            'processing': ['shipped', 'cancelled'],
-            'shipped': ['delivered', 'cancelled'],
-            'delivered': ['completed', 'refunded'],
-            'completed': ['refunded'],
-            'cancelled': [], // Terminal state
-            'refunded': []   // Terminal state
+            'pending': ['processing', 'cancel'],
+            'processing': ['confirm', 'cancel'],
+            'confirm': ['delivery', 'cancel'],
+            'delivery': ['success', 'cancel'],
+            // 'success': ['expired'],
+            'cancel': ["confirm"], // Terminal stat
         };
+
 
         if (!validTransitions[order.status]?.includes(status)) {
             return next(new AppError(
@@ -86,18 +85,21 @@ exports.updateOrders = [
 
                 // Handle inventory and business logic based on status
                 switch (status) {
-                    case 'confirmed':
+                    case 'confirm':
                         await handleOrderConfirmation(order, session);
                         break;
-                    case 'cancelled':
+                    case 'cancel':
                         await handleOrderCancellation(order, session);
                         break;
-                    case 'delivered':
-                        await handleDeliveryConfirmation(order, session);
+                    case 'success':
+                        await handleOrderSuccess(order, session);
                         break;
-                    case 'refunded':
-                        await handleRefund(order, session);
-                        break;
+                    // case 'delivery':
+                    //     await handleDeliveryConfirmation(order, session);
+                    // break;
+                    // case 'refunded':
+                    //     await handleRefund(order, session);
+                    // break;
                 }
 
                 // Send notifications
@@ -107,11 +109,12 @@ exports.updateOrders = [
             res.status(200).json({
                 message: "Order updated successfully.",
                 orderId: orderId,
-                newStatus: status
+                newStatus: status,
+                isSuccess: "true"
             });
 
         } catch (error) {
-            await session.abortTransaction();
+            // await session.abortTransaction();
             return next(new AppError(error.message || "Failed to update order", 500));
         } finally {
             session.endSession();
@@ -124,112 +127,100 @@ async function handleOrderConfirmation(order, session) {
     // Reserve inventory
     await Product.findByIdAndUpdate(
         order.productId,
-        { $inc: { inventory: -item.quantity, reserved: item.quantity } },
+        { $inc: { inventory: -order.quantity } },
         { session }
     );
-
-    // Process payment if not already done
-    if (!order.paymentProcessed) {
-        const paymentResult = await processPayment(order);
-        if (!paymentResult.success) {
-            throw new Error("Payment processing failed");
-        }
-
-        await Order.findByIdAndUpdate(
-            order._id,
-            { paymentProcessed: true, paymentId: paymentResult.paymentId },
-            { session }
-        );
-    }
 }
 
 async function handleOrderCancellation(order, session) {
     // Release reserved inventory
-    for (const item of order.items) {
-        await Product.findByIdAndUpdate(
-            item.product._id,
-            { $inc: { stock: item.quantity, reserved: -item.quantity } },
-            { session }
-        );
-    }
-
-    // Process refund if payment was made
-    if (order.paymentProcessed) {
-        await initiateRefund(order);
-    }
-}
-
-async function handleDeliveryConfirmation(order, session) {
-    // Update delivery timestamp
-    await Order.findByIdAndUpdate(
-        order._id,
-        { deliveredAt: new Date() },
-        { session }
-    );
-
-    // Release reserved inventory (convert to sold)
-    for (const item of order.items) {
-        await Product.findByIdAndUpdate(
-            item.product._id,
-            {
-                $inc: { reserved: -item.quantity, sold: item.quantity },
-                $push: { salesHistory: { orderId: order._id, quantity: item.quantity, date: new Date() } }
-            },
-            { session }
-        );
-    }
-}
-
-async function handleRefund(order, session) {
-    // Process refund
-    const refundResult = await processRefund(order);
-    if (!refundResult.success) {
-        throw new Error("Refund processing failed");
-    }
-
-    await Order.findByIdAndUpdate(
-        order._id,
-        {
-            refunded: true,
-            refundId: refundResult.refundId,
-            refundedAt: new Date()
-        },
+    await Product.findByIdAndUpdate(
+        order.productId,
+        { $inc: { inventory: order.quantity } },
         { session }
     );
 }
 
-async function sendStatusUpdateNotification(order, status) {
-    // Send email/SMS to customer
-    const notifications = {
-        'confirmed': 'Your order has been confirmed and is being prepared.',
-        'processing': 'Your order is being processed.',
-        'shipped': 'Your order has been shipped.',
-        'delivered': 'Your order has been delivered.',
-        'cancelled': 'Your order has been cancelled.',
-        'refunded': 'Your refund has been processed.'
-    };
-
-    // Implement notification service
-    await NotificationService.send({
-        to: order.customer.email,
-        subject: `Order ${order.orderNumber} - ${status}`,
-        message: notifications[status],
-        orderId: order._id
-    });
+async function handleOrderSuccess(order, session) {
+    // Release reserved inventory
+    await Product.findByIdAndUpdate(
+        order.productId,
+        { $inc: { soldCount: order.quantity } },
+        { session }
+    );
 }
 
-// Placeholder functions for payment processing
-async function processPayment(order) {
-    // Implement payment gateway integration
-    return { success: true, paymentId: 'pay_' + Date.now() };
-}
+// async function handleDeliveryConfirmation(order, session) {
+//     // Update delivery timestamp
+//     await Order.findByIdAndUpdate(
+//         order._id,
+//         { deliveredAt: new Date() },
+//         { session }
+//     );
 
-async function initiateRefund(order) {
-    // Implement refund processing
-    return { success: true, refundId: 'ref_' + Date.now() };
-}
+//     // Release reserved inventory (convert to sold)
+//     for (const item of order.items) {
+//         await Product.findByIdAndUpdate(
+//             item.product._id,
+//             {
+//                 $inc: { reserved: -item.quantity, sold: item.quantity },
+//                 $push: { salesHistory: { orderId: order._id, quantity: item.quantity, date: new Date() } }
+//             },
+//             { session }
+//         );
+//     }
+// }
 
-async function processRefund(order) {
-    // Implement refund processing
-    return { success: true, refundId: 'ref_' + Date.now() };
-}
+// async function handleRefund(order, session) {
+//     // Process refund
+//     const refundResult = await processRefund(order);
+//     if (!refundResult.success) {
+//         throw new Error("Refund processing failed");
+//     }
+
+//     await Order.findByIdAndUpdate(
+//         order._id,
+//         {
+//             refunded: true,
+//             refundId: refundResult.refundId,
+//             refundedAt: new Date()
+//         },
+//         { session }
+//     );
+// }
+
+// async function sendStatusUpdateNotification(order, status) {
+//     // Send email/SMS to customer
+//     const notifications = {
+//         'confirmed': 'Your order has been confirmed and is being prepared.',
+//         'processing': 'Your order is being processed.',
+//         'shipped': 'Your order has been shipped.',
+//         'delivered': 'Your order has been delivered.',
+//         'cancelled': 'Your order has been cancelled.',
+//         'refunded': 'Your refund has been processed.'
+//     };
+
+//     // Implement notification service
+//     await NotificationService.send({
+//         to: order.customer.email,
+//         subject: `Order ${order.orderNumber} - ${status}`,
+//         message: notifications[status],
+//         orderId: order._id
+//     });
+// }
+
+// // Placeholder functions for payment processing
+// async function processPayment(order) {
+//     // Implement payment gateway integration
+//     return { success: true, paymentId: 'pay_' + Date.now() };
+// }
+
+// async function initiateRefund(order) {
+//     // Implement refund processing
+//     return { success: true, refundId: 'ref_' + Date.now() };
+// }
+
+// async function processRefund(order) {
+//     // Implement refund processing
+//     return { success: true, refundId: 'ref_' + Date.now() };
+// }
