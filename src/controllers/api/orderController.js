@@ -385,7 +385,7 @@ exports.createCheckoutSession = [
                     }
 
                     // Enhanced product validation
-                    if (!product.name?.trim() || !Array.isArray(product.images) || !product.images.length) {
+                    if (!product.name?.trim() || !product.images.length) {
                         throw new AppError(`Product ${product.name || product._id} is missing required information`, 400);
                     }
 
@@ -588,7 +588,6 @@ exports.cashOnDelivery = [
             status: "pending",
             userId: userId,
             isPaid: false,
-            status: "unpaid"
         })
 
         if (!orders || orders.length === 0) {
@@ -643,7 +642,7 @@ exports.cashOnDelivery = [
         }
 
         await orderQueue.remove(`order:${code}`);
-        await Order.updateMany({ code }, { status: "pending", payment: "cod" })
+        await Order.updateMany({ code }, { status: "processing", payment: "cod" })
 
         res.status(200).json({ message: "Cash on delivery success. Please wait for merchant confirm.", isSuccess: true, })
 
@@ -821,7 +820,7 @@ exports.checkoutSuccess = [
                     orderUpdateData.refundReason = refundReason.join(', ');
                 } else {
                     orderUpdateData.isPaid = true;
-                    orderUpdateData.status = "confirmed";
+                    orderUpdateData.status = "confirm";
                     orderUpdateData.paidAt = new Date();
                 }
 

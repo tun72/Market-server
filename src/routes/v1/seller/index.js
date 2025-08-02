@@ -3,6 +3,8 @@ const router = express.Router();
 const eventController = require("../../../controllers/seller/eventController");
 const productController = require("../../../controllers/seller/productController");
 const orderController = require("../../../controllers/seller/orderController");
+const dashboardController = require("../../../controllers/seller/dashboardController");
+
 
 const upload = require("../../../middlewares/uploadFile");
 
@@ -35,7 +37,8 @@ router.get("/products/:id", productController.getProductById)
 router.get("/orders", orderController.getAllOrders)
 router.patch("/orders/update", orderController.updateOrders)
 
-
+// dashboard
+router.get("/status", dashboardController.getStatus)
 
 
 module.exports = router

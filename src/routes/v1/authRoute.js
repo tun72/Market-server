@@ -12,7 +12,8 @@ const OAuth2Strategy = require("passport-google-oauth2").Strategy;
 
 
 router.post("/signin/merchant", authController.merchantSignIn)
-router.post("/signin/admin", authController.adminSignIn)
+
+router.post("/signin/admin-merchant", authController.adminSignIn)
 
 router.post("/signin", authController.signIn);
 router.post("/signup", authController.signUp);

@@ -131,7 +131,6 @@ exports.merchantSignIn = [
         const user = await Seller.findOne({ email }).select("+password");
 
 
-
         if (!user || !(await user.correctPassword(password, user.password)))
             return next(new AppError("Incorrect Email or Password.", 400));
 
@@ -161,14 +160,15 @@ exports.adminSignIn = [
             return next(new AppError(errors[0].msg, 400));
         }
         const { email, password } = req.body;
-        const user = await Admin.findOne({ email }).select("+password");
-
+        const user = await User.findOne({ email }).select("+password");
         if (!user || !(await user.correctPassword(password, user.password)))
             return next(new AppError("Incorrect Email or Password.", 400));
 
-        if (user.role !== "admin") {
-            return next(new AppError("You are not admin", 403));
+        if (user.role !== "admin" && user.role !== "seller") {
+            return next(new AppError("Access Denied!", 403));
         }
 
         createSendToken({ user, res, statusCode: 200, next });
     })]
+
+
