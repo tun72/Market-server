@@ -3,7 +3,7 @@ const router = express.Router();
 const productController = require("../../../controllers/api/productController")
 const cartController = require("../../../controllers/api/cartContoller");
 const orderController = require("../../../controllers/api/orderController");
-
+const adsController = require("../../../controllers/api/adsController");
 const merchantController = require("../../../controllers/api/merchantController");
 const authMiddleware = require("../../../middlewares/authMiddleware");
 const authorise = require("../../../middlewares/authoriseMiddleware");
@@ -29,6 +29,8 @@ router.get("/categories/:id", productController.getCategories)
 router.get("/merchants", merchantController.getAllMerchants)
 router.get("/merchants/:id", merchantController.getMerchantById)
 
+router.get("/ads", adsController.getAllAds)
+
 
 // order
 router.use(authMiddleware, authorise(true, "customer"))
@@ -53,6 +55,10 @@ router.post("/cash-on-delivery", orderController.cashOnDelivery);
 
 router.get("/orders", orderController.getOrders)
 router.get("/orders/:code", orderController.getOrderByCode)
+
+
+// ads
+
 
 
 module.exports = router
