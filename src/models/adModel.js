@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
 const adsSchema = new mongoose.Schema({
+    company: { type: String, required: true },
+    product: { type: String, required: true },
     link: {
         type: String,
         required: true
