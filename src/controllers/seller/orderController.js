@@ -7,27 +7,181 @@ const factory = require("../handlerFactory");
 const mongoose = require("mongoose");
 const { Product } = require("../../models/productModel");
 
-exports.getAllOrders = [
-    catchAsync(async (req, res, next) => {
-        const userId = req.userId
-        const merchant = await Seller.findById(userId)
-        if (!merchant) {
-            next(AppError("This account is not registered.", 403))
+exports.getAllOrders = catchAsync(async (req, res, next) => {
+    const userId = req.userId;
+
+    // Extract pagination and sorting parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const sort = req.query.sort || '-createdAt'; // Default: newest first
+    const skip = (page - 1) * limit;
+
+    // Parse sort parameter
+    let sortField = 'createdAt';
+    let sortOrder = -1; // Default descending
+
+    if (sort) {
+        if (sort.startsWith('-')) {
+            sortField = sort.substring(1);
+            sortOrder = -1; // Descending
+        } else {
+            sortField = sort;
+            sortOrder = 1; // Ascending
         }
-        req.query.merchant = merchant.id
-        next()
-    }), factory.getAll({
-        Model: Order,
-        fields: ["productId", "userId"]
+    }
 
-    })
-]
+    // Map field names to actual fields in aggregation result
+    const fieldMapping = {
+        'name': 'user.name',
+        'email': 'user.email',
+        'createdAt': 'createdAt',
+        'status': 'status',
+        'totalAmount': 'totalAmount',
+        'totalProducts': 'totalProducts',
+        'isPaid': 'isPaid',
+        'isDelivered': 'isDelivered',
+        'code': 'code'
+    };
 
+    // Use mapped field or default to createdAt
+    const actualSortField = fieldMapping[sortField] || 'createdAt';
+    const sortObject = { [actualSortField]: sortOrder };
+
+    const merchant = await Seller.findById(userId);
+    if (!merchant) {
+        return next(new AppError("This account is not registered.", 403));
+    }
+
+    const aggregationPipeline = [
+        {
+            $match: { merchant: merchant._id }
+        },
+        {
+            $group: {
+                _id: "$code",
+                products: { $push: "$$ROOT" },
+                totalProducts: { $sum: 1 },
+                status: { $first: "$status" },
+                createdAt: { $first: "$createdAt" },
+                user: { $first: "$userId" },
+                isPaid: { $first: "$isPaid" },
+                payment: { $first: "$payment" },
+                isDelivered: { $first: "$isDelivered" }
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "user",
+                foreignField: "_id",
+                as: "userDetails"
+            }
+        },
+        {
+            $unwind: "$products"
+        },
+        {
+            $lookup: {
+                from: "products",
+                localField: "products.productId",
+                foreignField: "_id",
+                as: "productDetails"
+            }
+        },
+        {
+            $unwind: "$productDetails"
+        },
+        {
+            $addFields: {
+                "products.name": "$productDetails.name",
+                "products.price": "$productDetails.price",
+                "products.image": "$productDetails.image",
+                "products.totalPrice": {
+                    $multiply: ["$products.quantity", "$productDetails.price"]
+                }
+            }
+        },
+        {
+            $group: {
+                _id: "$_id",
+                status: { $first: "$status" },
+                createdAt: { $first: "$createdAt" },
+                user: { $first: { $arrayElemAt: ["$userDetails", 0] } },
+                isPaid: { $first: "$isPaid" },
+                payment: { $first: "$payment" },
+                isDelivered: { $first: "$isDelivered" },
+                totalProducts: { $first: "$totalProducts" },
+                products: { $push: "$products" },
+                totalAmount: { $sum: "$products.totalPrice" }
+            }
+        },
+        {
+            $sort: sortObject
+        },
+        {
+            $project: {
+                _id: 0,
+                code: "$_id",
+                status: 1,
+                createdAt: 1,
+                isPaid: 1,
+                payment: 1,
+                products: {
+                    productId: 1,
+                    quantity: 1,
+                    name: 1,
+                    price: 1,
+                    image: 1,
+                    totalPrice: 1
+                },
+                user: {
+                    name: 1,
+                    email: 1,
+                    shippingAddresses: 1
+                },
+                totalProducts: 1,
+                totalAmount: 1,
+                isDelivered: 1
+            }
+        }
+    ];
+
+    // Get total count for pagination info
+    const totalCountPipeline = [
+        ...aggregationPipeline.slice(0, -2), // Remove sort and project stages
+        { $count: "total" }
+    ];
+
+    // Add pagination stages
+    const paginatedPipeline = [
+        ...aggregationPipeline,
+        { $skip: skip },
+        { $limit: limit }
+    ];
+
+    // Execute both pipelines
+    const [orders, totalCountResult] = await Promise.all([
+        Order.aggregate(paginatedPipeline),
+        Order.aggregate(totalCountPipeline)
+    ]);
+
+    const totalOrders = totalCountResult[0]?.total || 0;
+
+
+    res.status(200).json({
+        isSuccess: true,
+        orders: orders,
+        pagination: {
+            entriesPerPage: limit,
+            page: page,
+            totalResult: totalOrders,
+            foundResult: orders.length
+        },
+    });
+});
 
 exports.updateOrders = [
-    body("orderId", "Order Id is required.").custom((id) => {
-        return mongoose.Types.ObjectId.isValid(id);
-    }),
+    body("code", "Order code is required."),
     body("status", "Status is required").notEmpty().custom((value) => {
         const all_status = ["pending", "processing", "confirm", "cancel", "delivery", "success", "expired"];
         if (!all_status.includes(value)) {
@@ -42,14 +196,16 @@ exports.updateOrders = [
             return next(new AppError(errors[0].msg, 400));
         }
 
-        const { orderId, status } = req.body;
+        const { code, status } = req.body;
+        const userId = req.userId
 
         // Find order with additional details
-        const order = await Order.findById(orderId).populate('productId.product');
+        const order = await Order.find({ merchant: userId, code }).populate('productId.product');
         if (!order) {
             return next(new AppError("No order found with that Id.", 404));
         }
 
+        const currentStatus = order[0].status
         // Validate status transition
         const validTransitions = {
             'pending': ['processing', 'cancel'],
@@ -61,9 +217,9 @@ exports.updateOrders = [
         };
 
 
-        if (!validTransitions[order.status]?.includes(status)) {
+        if (!validTransitions[currentStatus]?.includes(status)) {
             return next(new AppError(
-                `Cannot change order status from '${order.status}' to '${status}'`,
+                `Cannot change order status from '${currentStatus}' to '${status}'`,
                 400
             ));
         }
@@ -74,16 +230,7 @@ exports.updateOrders = [
         try {
             await session.withTransaction(async () => {
                 // Update order status
-                const updatedOrder = await Order.findByIdAndUpdate(
-                    orderId,
-                    {
-                        status: status,
-                        updatedAt: new Date(),
-                    },
-                    { new: true, session }
-                );
 
-                // Handle inventory and business logic based on status
                 switch (status) {
                     case 'confirm':
                         await handleOrderConfirmation(order, session);
@@ -101,6 +248,17 @@ exports.updateOrders = [
                     //     await handleRefund(order, session);
                     // break;
                 }
+                const updatedOrders = await Order.updateMany(
+                    { code, merchant: userId },
+                    {
+                        status: status,
+                        updatedAt: new Date(),
+                    },
+                    { session }
+                );
+
+                // Handle inventory and business logic based on status
+
 
                 // Send notifications
                 // await sendStatusUpdateNotification(updatedOrder, status);
@@ -108,16 +266,14 @@ exports.updateOrders = [
 
             res.status(200).json({
                 message: "Order updated successfully.",
-                orderId: orderId,
-                newStatus: status,
                 isSuccess: "true"
             });
 
-        } catch (error) {
-            // await session.abortTransaction();
-            return next(new AppError(error.message || "Failed to update order", 500));
-        } finally {
             session.endSession();
+
+        } catch (error) {
+            await session.abortTransaction();
+            return next(new AppError(error.message || "Failed to update order", 500));
         }
     })
 ];
@@ -125,20 +281,38 @@ exports.updateOrders = [
 // Helper functions for status-specific logic
 async function handleOrderConfirmation(order, session) {
     // Reserve inventory
-    await Product.findByIdAndUpdate(
-        order.productId,
-        { $inc: { inventory: -order.quantity } },
-        { session }
-    );
+    for (const item of order) {
+        const productId = item.productId?._id || item.productId; // Ensure correct productId extraction
+        if (!productId) {
+            throw new Error("Invalid productId in order.");
+        }
+
+        await Product.findByIdAndUpdate(
+            productId,
+            { $inc: { inventory: -item.quantity } },
+            { session }
+        );
+    }
 }
 
 async function handleOrderCancellation(order, session) {
-    // Release reserved inventory
-    await Product.findByIdAndUpdate(
-        order.productId,
-        { $inc: { inventory: order.quantity } },
-        { session }
-    );
+    // Release reserved inventory for each item in the order
+
+    for (const item of order) {
+        const productId = item.productId?._id || item.productId; // Ensure correct productId extraction
+        if (!productId) {
+            throw new Error("Invalid productId in order.");
+        }
+
+        // If the order status is "confirm", increase the inventory
+        if (item.status === "confirm") {
+            await Product.findByIdAndUpdate(
+                productId,
+                { $inc: { inventory: item.quantity } },
+                { session }
+            );
+        }
+    }
 }
 
 async function handleOrderSuccess(order, session) {

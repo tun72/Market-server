@@ -385,7 +385,7 @@ exports.createCheckoutSession = [
                     }
 
                     // Enhanced product validation
-                    if (!product.name?.trim() || !Array.isArray(product.images) || !product.images.length) {
+                    if (!product.name?.trim() || !product.images.length) {
                         throw new AppError(`Product ${product.name || product._id} is missing required information`, 400);
                     }
 
@@ -820,7 +820,7 @@ exports.checkoutSuccess = [
                     orderUpdateData.refundReason = refundReason.join(', ');
                 } else {
                     orderUpdateData.isPaid = true;
-                    orderUpdateData.status = "confirmed";
+                    orderUpdateData.status = "confirm";
                     orderUpdateData.paidAt = new Date();
                 }
 
