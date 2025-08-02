@@ -13,6 +13,9 @@ const mongoose = require("mongoose")
 const factory = require("../handlerFactory");
 const { removeImages } = require("../../utils/fileDelete");
 const Seller = require("../../models/sellerModel");
+const sanitizeHtml = require("sanitize-html");
+
+const { decode } = require('html-entities');
 
 
 
@@ -70,7 +73,11 @@ exports.getProductById = [
 
 exports.createProduct = [
     body("name", "Name is required.").trim("").notEmpty().escape(),
-    body("body", "body is required.").trim("").notEmpty().escape(),
+    body("body", "body is required.").trim("").notEmpty().escape().customSanitizer((value) => {
+
+        return sanitizeHtml(value)
+
+    }),
     body("description", "Description is required.").trim("").notEmpty().escape(),
     body("price", "Price is required.")
         .isFloat({ min: 0.1 })
@@ -128,6 +135,10 @@ exports.createProduct = [
 
         let { name, body, description, price, discount, shipping, type, category, tags, colors, sizes, brand, inventory } = req.body;
         checkPhotoIfNotExistArray(req.files)
+
+        body = decode(body)
+
+
 
         // need to create aws s3 
         // image optimize
@@ -357,7 +368,9 @@ exports.updateProduct = [
         return mongoose.Types.ObjectId.isValid(id);
     }),
     body("name", "Name is required.").trim("").notEmpty().escape(),
-    body("body", "body is required.").trim("").notEmpty().escape(),
+    body("body", "body is required.").trim("").notEmpty().escape().customSanitizer((value) => {
+        return sanitizeHtml(value)
+    }),
     body("description", "Description is required.").trim("").notEmpty().escape(),
     body("price", "Price is required.")
         .isFloat({ min: 0.1 })
@@ -445,6 +458,9 @@ exports.updateProduct = [
                 }
             }
 
+
+
+
             // Check for duplicate indices
             const indices = value.map(item => item.index);
             const uniqueIndices = [...new Set(indices)];
@@ -467,6 +483,7 @@ exports.updateProduct = [
 
         let { productId, name, body, description, price, discount, shipping, type, category, tags, colors, sizes, brand, inventory, update_images } = req.body;
 
+        body = decode(body)
         const product = await Product.findById(productId)
 
         if (!product) {

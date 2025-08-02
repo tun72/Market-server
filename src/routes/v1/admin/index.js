@@ -4,6 +4,10 @@ const { body } = require('express-validator');
 const eventController = require("../../../controllers/admin/eventController");
 const sellerController = require("../../../controllers/admin/sellerController");
 const eventMiddleware = require("../../../middlewares/eventMiddleware");
+
+const adController = require("../../../controllers/admin/adController");
+
+
 const handleErrorMessage = require("../../../middlewares/handelErrorMessage");
 const upload = require("../../../middlewares/uploadFile");
 
@@ -53,6 +57,18 @@ router.route("/events/:id").put(
     eventMiddleware.updateImage,
     eventController.updateEvent)
     .delete(eventController.deleteEvent)
+
+
+// ads
+
+router.route("/ads").get(adController.getAllAds).
+    post(upload.fields([
+        { name: "image", maxCount: 1 }
+    ]), adController.createAd)
+    .patch(upload.fields([
+        { name: "image", maxCount: 1 }
+    ]), adController.updateAd).delete(adController.deleteAd)
+
 
 
 

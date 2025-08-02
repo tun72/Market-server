@@ -4,14 +4,12 @@ const AppError = require("../../utils/appError");
 const User = require("../../models/userModel");
 
 const Order = require("../../models/orderModel");
-const Cart = require("../../models/cartModel");
 const { Product } = require("../../models/productModel");
 const stripe = require("../../libs/stripe");
 const dotenv = require("dotenv");
 const Seller = require("../../models/sellerModel");
 const orderQueue = require("../../jobs/queues/OrderQueue");
 const mongoose = require("mongoose");
-const ApiFeature = require("../../utils/apiFeatures");
 const emailQueue = require("../../jobs/queues/EmailQueue");
 const { getEmailContent } = require("../../utils/sendMail");
 dotenv.config()
