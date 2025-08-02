@@ -6,6 +6,8 @@ const sellerController = require("../../../controllers/admin/sellerController");
 const eventMiddleware = require("../../../middlewares/eventMiddleware");
 
 const adController = require("../../../controllers/admin/adController");
+const typeController = require("../../../controllers/admin/typeController");
+
 
 
 const handleErrorMessage = require("../../../middlewares/handelErrorMessage");
@@ -68,6 +70,15 @@ router.route("/ads").get(adController.getAllAds).
     .patch(upload.fields([
         { name: "image", maxCount: 1 }
     ]), adController.updateAd).delete(adController.deleteAd)
+
+// types
+router.route("/types").get(typeController.getAllTypes).
+    post(upload.fields([
+        { name: "image", maxCount: 1 }
+    ]), typeController.createType)
+    .patch(upload.fields([
+        { name: "image", maxCount: 1 }
+    ]), typeController.updateType).delete(typeController.deleteType)
 
 
 

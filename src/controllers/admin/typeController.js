@@ -2,20 +2,18 @@ const { body, validationResult } = require("express-validator");
 const catchAsync = require("../../utils/catchAsync");
 const { removeImages } = require("../../utils/fileDelete");
 const { checkPhotoIfNotExistFields } = require("../../utils/check");
-const Ad = require("../../models/adModel");
+
 const AppError = require("../../utils/appError");
 const ImageQueue = require("../../jobs/queues/ImageQueue");
 const factory = require("../handlerFactory");
 const mongoose = require("mongoose")
 const { decode } = require('html-entities');
+const { Type } = require("../../models/productModel");
 
-exports.getAllAds = factory.getAll({ Model: Ad })
+exports.getAllTypes = factory.getAll({ Model: Type })
 
-exports.createAd = [
-    body("link", "Link is required.").trim("").notEmpty().escape(),
-    body("company", "Company name is required.").trim("").notEmpty().escape(),
-    body("product", "product name is required.").trim("").notEmpty().escape(),
-
+exports.createType = [
+    body("name", "Name is required.").trim("").notEmpty().escape(),
     catchAsync(async (req, res, next) => {
 
         const errors = validationResult(req).array({ onlyFirstError: true });
@@ -58,23 +56,20 @@ exports.createAd = [
         console.log(image);
 
         const data = {
-            link: decode(link),
+            name,
             image,
-            company,
-            product
+
         }
 
-        const ad = await Ad.create(data)
-        res.status(200).json({ message: "Ad is successfully created", isSuccess: true })
+        await Type.create(data)
+        res.status(200).json({ message: "Type is successfully created", isSuccess: true })
 
     })
 ]
 
-exports.updateAd = [
-    body("link", "Link is required.").trim("").notEmpty().escape(),
-    body("company", "Company name is required.").trim("").notEmpty().escape(),
-    body("product", "product name is required.").trim("").notEmpty().escape(),
-    body("id", "Ad Id is required.").custom((id) => {
+exports.updateType = [
+    body("name", "Name is required.").trim("").notEmpty().escape(),
+    body("id", "Type id is required.").custom((id) => {
         return mongoose.Types.ObjectId.isValid(id);
     }),
     catchAsync(async (req, res, next) => {
@@ -95,18 +90,18 @@ exports.updateAd = [
         // need to create aws s3 
         // image optimize
 
-        const ads = await Ad.findById(data.id);
-        if (!ads) {
+        const type = await Type.findById(data.id);
+        if (!type) {
             if (req.files["image"]) {
                 removeImages([req.files["image"][0].filename])
             }
-            return next(new AppError("Ads not found", 409));
+            return next(new AppError("Types not found", 409));
         }
 
 
         if (req.files["image"]) {
             const splitName = req.files["image"][0].filename.split(".")[0] + ".webp"
-            removeImages([ads["image"]], [ads["image"].split(".")[0] + ".webp"])
+            removeImages([type["image"]], [type["image"].split(".")[0] + ".webp"])
             data["image"] = req.files["image"][0].filename;
 
             await ImageQueue.add("optimize-image", {
@@ -124,16 +119,14 @@ exports.updateAd = [
             })
         }
 
-        data.link = decode(data.link)
-
-        await Ad.findByIdAndUpdate(ads._id, data)
-        res.status(200).json({ message: "Ad is successfully update", isSuccess: true })
+        await Type.findByIdAndUpdate(type._id, data)
+        res.status(200).json({ message: "Type is successfully updated", isSuccess: true })
 
     })
 ]
 
-exports.deleteAd = [
-    body("id", "Ad Id is required.").custom((id) => {
+exports.deleteType = [
+    body("id", "Type Id is required.").custom((id) => {
         return mongoose.Types.ObjectId.isValid(id);
     }),
     catchAsync(async (req, res, next) => {
@@ -143,18 +136,18 @@ exports.deleteAd = [
         }
 
         let data = req.body;
-        const ads = await Ad.findById(data.id);
-        if (!ads) {
+        const type = await Type.findById(data.id);
+        if (!type) {
             if (req.files["image"]) {
                 removeImages([req.files["image"][0].filename])
             }
             return next(new AppError("Seller not found", 409));
         }
 
-        const originalFiles = [ads.image];
+        const originalFiles = [type.image];
         const optimizeFiles = originalFiles.map((file) => file.split(".")[0] + ".webp")
         await removeImages(originalFiles, optimizeFiles);
-        await Ad.findByIdAndDelete(ads._id)
-        res.status(200).json({ message: "Ad is successfully deleted", isSuccess: true })
+        await Type.findByIdAndDelete(type._id)
+        res.status(200).json({ message: "Type is successfully deleted", isSuccess: true })
 
     })]
