@@ -63,6 +63,16 @@ const sellerSchema = new mongoose.Schema({
 });
 
 
+sellerSchema.virtual('optimize_logo').get(function () {
+    return this.logo.split(".")[0] + ".webp"
+});
+
+
+
+// sellerSchema.virtual('optimize_logo').get(function () {
+//     return this.logo.split(".")[0] + ".webp"
+// });
+
 sellerSchema.virtual("products", {
     ref: "Product",
     localField: "_id",

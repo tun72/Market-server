@@ -1,4 +1,4 @@
-const { body, validationResult } = require("express-validator");
+const { body, validationResult, param } = require("express-validator");
 const Seller = require("../../models/sellerModel");
 
 const factory = require("../handlerFactory");
@@ -9,14 +9,39 @@ const { checkPhotoIfNotExistFields } = require("../../utils/check");
 const ImageQueue = require("../../jobs/queues/ImageQueue");
 const { generateRandToken } = require("../../utils/generateToken");
 const { default: mongoose } = require("mongoose");
+const User = require("../../models/userModel");
+const bcrypt = require("bcryptjs")
 // Seller
 exports.getAllSellers = factory.getAll({
     Model: Seller,
 });
 
-exports.getSellerById = factory.getOne({
-    Model: Seller
-})
+exports.getSellerById = [
+    param("id", "Seller Id is required.").notEmpty(),
+    catchAsync(async (req, res, next) => {
+
+        const errors = validationResult(req).array({ onlyFirstError: true });
+        if (errors.length) {
+            return next(new AppError(errors[0].msg, 400));
+        }
+
+        const { id } = req.params
+        const userId = req.userId;
+        const admin = await User.findById(userId)
+
+        if (!admin) {
+            next(new AppError("You'r not allowed this action.", 403))
+        }
+
+        const seller = await Seller.findById(id).select("+NRCBack +NRCFront")
+
+        if (!seller) {
+            next(new AppError("No seller found with that id.", 400))
+        }
+
+        res.status(200).json({ message: "Success", isSuccess: true, seller })
+    })
+]
 
 exports.createSeller = [
     body("email", "Invalid Email").trim("").isEmail().notEmpty(),
@@ -150,10 +175,10 @@ exports.updateSeller = [
     }),
     body("email", "Invalid Email").trim("").isEmail().notEmpty(),
     body("password").trim("")
-        .notEmpty()
+        .optional()
         .isLength({ min: 8 })
         .withMessage("Password must be minium of 8 characters."),
-    body("passwordConfirm").trim("").notEmpty().isLength({ min: 8 })
+    body("passwordConfirm").trim("").optional().isLength({ min: 8 })
         .withMessage("Password must be minium of 8 characters."),
     body("name", "Name is required").trim("").notEmpty(),
     body("phone", "Phone is required").trim("").notEmpty(),
