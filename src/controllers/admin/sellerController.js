@@ -139,7 +139,7 @@ exports.createSeller = [
         }
         const newSeller = await Seller.create(seller);
 
-        res.status(200).json({ message: "Product successfully created", data: { seller: newSeller } });
+        res.status(200).json({ message: "Product successfully created", seller: newSeller, isSuccess: true });
 
     })
 ]
@@ -257,7 +257,7 @@ exports.updateSeller = [
         }
         const updateSeller = await Seller.findByIdAndUpdate(data.id, data)
 
-        res.status(200).json({ message: "Seller successfully updated", data: { seller: updateSeller } });
+        res.status(200).json({ message: "Seller successfully updated", isSuccess: true });
 
     })
 ]
