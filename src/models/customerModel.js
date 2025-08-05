@@ -8,19 +8,13 @@ const customerSchema = new mongoose.Schema({
     googleId: {
         type: String,
     },
-    shippingAddresses: [
-        {
-            street: String,
-            city: String,
-            state: String,
-            country: String,
-            postalCode: String,
-            isDefault: {
-                type: Boolean,
-                default: false,
-            },
-        },
-    ],
+    shippingAddresses: {
+        street: String,
+        city: String,
+        state: String,
+        country: String,
+        postalCode: String,
+    },
     image: {
         type: String
     },

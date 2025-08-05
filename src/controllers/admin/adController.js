@@ -10,6 +10,7 @@ const mongoose = require("mongoose")
 const { decode } = require('html-entities');
 
 exports.getAllAds = factory.getAll({ Model: Ad })
+exports.getADsById = factory.getOne({ Model: Ad })
 
 exports.createAd = [
     body("link", "Link is required.").trim("").notEmpty().escape(),
