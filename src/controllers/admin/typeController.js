@@ -12,6 +12,8 @@ const { Type } = require("../../models/productModel");
 
 exports.getAllTypes = factory.getAll({ Model: Type })
 
+exports.getTypesById = factory.getOne({ Model: Type })
+
 exports.createType = [
     body("name", "Name is required.").trim("").notEmpty().escape(),
     catchAsync(async (req, res, next) => {

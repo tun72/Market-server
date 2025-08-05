@@ -626,7 +626,7 @@ exports.cashOnDelivery = [
             }
 
             // Validate product has required fields
-            if (!product.name || !product.images || product.images.length === 0) {
+            if (!product.name) {
                 throw new AppError(`Product ${product.name || product._id} is missing required information`, 400);
             }
 
