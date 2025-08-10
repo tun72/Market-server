@@ -6,10 +6,6 @@ const authController = require("../../controllers/authController");
 
 const passport = require("passport");
 const session = require("express-session");
-const Customer = require("../../models/customerModel");
-const { generateRandToken } = require("../../utils/generateToken");
-const OAuth2Strategy = require("passport-google-oauth2").Strategy;
-
 
 router.post("/signin/merchant", authController.merchantSignIn)
 
@@ -17,20 +13,24 @@ router.post("/signin/admin-merchant", authController.adminSignIn)
 
 router.post("/signin", authController.signIn);
 router.post("/signup", authController.signUp);
+const Customer = require("../../models/customerModel");
+const { generateAccessToken } = require("../../utils/generateToken");
+const OAuth2Strategy = require("passport-google-oauth2").Strategy;
 
 
 
-// router.use(
-//     session({
-//         secret: process.env.SECRET_KEY,
-//         resave: false,
-//         saveUninitialized: true,
-//     })
-// );
+router.use(
+    session({
+        secret: process.env.SECRET_KEY,
+        resave: false,
+        saveUninitialized: true,
+    })
+);
 
 
-// router.use(passport.initialize());
-// router.use(passport.session());
+router.use(passport.initialize());
+router.use(passport.session());
+
 
 passport.use(
     new OAuth2Strategy(
@@ -77,15 +77,15 @@ passport.deserializeUser((user, done) => {
 });
 
 
+
+
 router.get(
-    "/google",
-    passport.authenticate("google", { scope: ["profile", "email"] })
+    "/google", authController.LoginWithGoogle
 );
 
 router.get(
-    "/google/callback",
-    passport.authenticate("google", { failureRedirect: "/login" }),
-    (req, res, next) => {
+    "/google/callback", passport.authenticate("google", { failureRedirect: "/login" }),
+    async (req, res, next) => {
         // `req.user` should be available after authentication
         const user = req.user;
 
@@ -93,8 +93,26 @@ router.get(
             return res.status(400).json({ message: "Authentication failed" });
         }
 
+        const accessToken = await generateAccessToken({ id: user.id });
 
-        res.redirect(process.env.FRONTEND + "/user");
+
+
+        const data = {
+            isSuccess: true,
+            message: "Success",
+            token: accessToken,
+            data: {
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role
+                }
+            },
+        }
+
+
+        res.redirect(process.env.FRONTEND_URL + "/user?token=" + accessToken);
     }
 );
 

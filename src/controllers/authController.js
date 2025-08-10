@@ -7,7 +7,10 @@ const dotenv = require("dotenv");
 dotenv.config()
 const { generateAccessToken, generateRefreshToken, generateRandToken } = require("../utils/generateToken");
 const Seller = require("../models/sellerModel");
-const Admin = require("../models/adminModel");
+
+
+const passport = require("passport");
+
 
 const createSendToken = async ({ user, res, statusCode, next }) => {
     if (!user) return next(new AppError("User is required to create token", 404));
@@ -170,5 +173,8 @@ exports.adminSignIn = [
 
         createSendToken({ user, res, statusCode: 200, next });
     })]
+
+exports.LoginWithGoogle = passport.authenticate("google", { scope: ["profile", "email"] })
+
 
 
