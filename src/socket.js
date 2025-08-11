@@ -5,11 +5,26 @@ let io = null
 
 const userSocketMap = new Map();
 const setupSocket = (server) => {
-    io = SocketIOServer(server, {
-        cors: {
-            origin: "*",
-            credentials: true,
+
+    let whitelist = ["http://localhost:5173", "http://localhost:5174"]
+    const corsOptions = {
+        origin: function (
+            origin,
+            callback
+        ) {
+            if (!origin) return callback(null, true);
+            if (whitelist.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error("Not allowed by CORS"));
+            }
         },
+        credentials: true,
+    };
+
+
+    io = SocketIOServer(server, {
+        cors: corsOptions
     });
 
 
@@ -47,6 +62,8 @@ const setupSocket = (server) => {
 
     io.on("connection", (socket) => {
         const userId = socket.handshake.query.userId;
+        console.log(userId);
+
         if (userId) {
             userSocketMap.set(userId, socket.id);
             io.emit("onlineUsers", Array.from(userSocketMap.keys()));

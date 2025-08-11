@@ -294,7 +294,7 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
         }
     ])
 
-    console.log(products);
+    // console.log(products);
 
     return res.status(200).json({ message: "sucess", products })
 })
