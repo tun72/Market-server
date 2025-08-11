@@ -247,7 +247,7 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
     // need to make this with aggregation and random limit 7
     const products = await Product.aggregate([
         { $match: { isFeatured: true } },
-        { $sample: { size: 5 } },
+        { $sample: { size: 10 } },
         { $addFields: { id: "$_id" } },
         {
             $lookup: {
@@ -263,7 +263,13 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
                 path: "$merchant",
                 preserveNullAndEmptyArrays: true // Optional: if some products have no merchant
             }
-        }, {
+        },
+        {
+            $addFields: {
+                optimize_images: "$images",
+            }
+        },
+        {
             $project: {
                 __v: 0,
                 _id: 0,
@@ -287,6 +293,8 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
             }
         }
     ])
+
+    console.log(products);
 
     return res.status(200).json({ message: "sucess", products })
 })
