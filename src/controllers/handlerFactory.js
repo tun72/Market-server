@@ -7,9 +7,9 @@ exports.getAll = ({ Model, fields = [] }) =>
     catchAsync(async (req, res, next) => {
         let filter = {};
 
-        if (req.filter) {
-            filter = req.filter;
-        }
+        // if (req.filter) {
+        //     filter = req.filter;
+        // }
         const page = req.query.page * 1 || 1;
         const filteredQuery = new ApiFeature(Model.find(filter), req.query).filter();
         const length = await filteredQuery.query.countDocuments();

@@ -19,13 +19,13 @@ const OAuth2Strategy = require("passport-google-oauth2").Strategy;
 
 
 
-router.use(
-    session({
-        secret: process.env.SECRET_KEY,
-        resave: false,
-        saveUninitialized: true,
-    })
-);
+// router.use(
+//     session({
+//         secret: process.env.SECRET_KEY,
+//         resave: false,
+//         saveUninitialized: true,
+//     })
+// );
 
 
 router.use(passport.initialize());
