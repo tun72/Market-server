@@ -15,17 +15,18 @@ router.post("/signin", authController.signIn);
 router.post("/signup", authController.signUp);
 const Customer = require("../../models/customerModel");
 const { generateAccessToken } = require("../../utils/generateToken");
+const { encrypt } = require("../../utils/encryptData");
 const OAuth2Strategy = require("passport-google-oauth2").Strategy;
 
 
 
-// router.use(
-//     session({
-//         secret: process.env.SECRET_KEY,
-//         resave: false,
-//         saveUninitialized: true,
-//     })
-// );
+router.use(
+    session({
+        secret: process.env.SECRET_KEY,
+        resave: false,
+        saveUninitialized: false,
+    })
+);
 
 
 router.use(passport.initialize());
@@ -111,8 +112,8 @@ router.get(
             },
         }
 
-
-        res.redirect(process.env.FRONTEND_URL + "/user?token=" + accessToken);
+        const encryptData = await encrypt(data);
+        res.redirect(process.env.FRONTEND_URL + "/user?token=" + encryptData.encryptedData);
     }
 );
 

@@ -3,10 +3,8 @@ const validator = require("validator");
 const { ObjectId } = Schema.Types;
 
 
-
-
 const paymentCategorySchema = new Schema({
-    seller: {
+    merchant: {
         type: ObjectId,
         ref: 'Seller',
         required: [true, "Payment method must belong to a seller"]
@@ -35,11 +33,11 @@ const paymentCategorySchema = new Schema({
         type: String,
         validate: [validator.isURL, "Please provide a valid QR code URL"]
     },
-    status: {
+    active: {
         type: Boolean,
         default: false
     },
-    verifiedAt: Date
+    // verifiedAt: Date
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
@@ -57,7 +55,7 @@ const withDrawSchema = new Schema({
         default: 'MMK',
         enum: ['MMK']
     },
-    seller: {
+    merchant: {
         type: ObjectId,
         ref: 'Seller',
         required: [true, "Withdrawal must belong to a seller"]
@@ -67,6 +65,7 @@ const withDrawSchema = new Schema({
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending'
     },
+
     transactionId: String,
     processedAt: Date
 }, {
@@ -75,6 +74,45 @@ const withDrawSchema = new Schema({
     toObject: { virtuals: true }
 });
 
+const paymentHistory = new Schema({
+    customer: {
+        type: ObjectId,
+        required: true
+    },
+    merchant: {
+        type: ObjectId,
+        required: true
+    },
+    paymentMethod: {
+        type: String,
+        required: [true, "Payment method type is required"],
+        enum: {
+            values: ['stripe'],
+            message: "Invalid payment method type"
+        }
+    },
+    amount: {
+        type: Number,
+        required: true
+    },
+    orderCode: {
+        type: String,
+        required: true
+    },
+    status: {
+        type: String,
+        required: true,
+        enum: {
+            values: ['income', "withdraw"],
+            message: "Invalid status"
+        }
+
+    }
+}, {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+})
 
 
 withDrawSchema.pre('save', async function (next) {
@@ -86,6 +124,7 @@ withDrawSchema.pre('save', async function (next) {
 });
 
 module.exports = {
+    PaymentHistory: model("PaymentHistory", paymentHistory),
     PaymentCategory: model('PaymentCategory', paymentCategorySchema),
     Withdraw: model('Withdraw', withDrawSchema)
 };

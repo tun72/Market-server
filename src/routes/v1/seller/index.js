@@ -4,6 +4,8 @@ const eventController = require("../../../controllers/seller/eventController");
 const productController = require("../../../controllers/seller/productController");
 const orderController = require("../../../controllers/seller/orderController");
 const dashboardController = require("../../../controllers/seller/dashboardController");
+const paymentController = require("../../../controllers/seller/paymentController");
+
 
 
 const upload = require("../../../middlewares/uploadFile");
@@ -39,6 +41,19 @@ router.patch("/orders/update", orderController.updateOrders)
 
 // dashboard
 router.get("/status", dashboardController.getStatus)
+
+//payment hostory
+router.get("/payment-history", paymentController.getAllPaymentHistory)
+
+router.route("/payments").get(paymentController.getPaymentMethod).
+    post(upload.fields([
+        { name: "QR", maxCount: 1 }
+    ]), paymentController.createPaymentMethod)
+    .patch(upload.fields([
+        { name: "QR", maxCount: 1 }
+    ]), paymentController.updatePaymentMethod).delete(paymentController.deletePaymentMethod)
+
+router.get("/payment:id", paymentController.getPaymentMethodById)
 
 
 module.exports = router

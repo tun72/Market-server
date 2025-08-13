@@ -54,9 +54,9 @@ const setupSocket = (server) => {
             io.to(recipientSocketId).emit("receiveMessage", messageData);
         }
 
-        if (senderSocketId) {
-            io.to(senderSocketId).emit("receiveMessage", messageData);
-        }
+        // if (senderSocketId) {
+        //     io.to(senderSocketId).emit("receiveMessage", messageData);
+        // }
     };
 
 

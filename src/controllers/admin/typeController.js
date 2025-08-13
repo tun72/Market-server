@@ -140,9 +140,6 @@ exports.deleteType = [
         let data = req.body;
         const type = await Type.findById(data.id);
         if (!type) {
-            if (req.files["image"]) {
-                removeImages([req.files["image"][0].filename])
-            }
             return next(new AppError("Seller not found", 409));
         }
 

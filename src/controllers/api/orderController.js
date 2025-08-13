@@ -12,6 +12,7 @@ const orderQueue = require("../../jobs/queues/OrderQueue");
 const mongoose = require("mongoose");
 const emailQueue = require("../../jobs/queues/EmailQueue");
 const { getEmailContent } = require("../../utils/sendMail");
+const { PaymentHistory } = require("../../models/paymentCategoryModel");
 dotenv.config()
 
 // Calculate total price including shipping and discount
@@ -120,7 +121,7 @@ exports.getOrders = catchAsync(async (req, res, next) => {
                 _id: 0
             }
         }
-    ]).skip(skip).limit(limit).sort("-createdAt")
+    ]).sort("-createdAt").skip(skip).limit(limit)
     res.status(200).json({
         status: "success",
         orders: orderStats,
@@ -597,6 +598,10 @@ exports.cashOnDelivery = [
             throw new AppError("Order has expired. Please create a new order.", 400);
         }
 
+
+
+
+
         const productIds = orders.map(order => order.productId);
 
         const products = await Product.find({
@@ -640,14 +645,41 @@ exports.cashOnDelivery = [
         }
 
         await orderQueue.remove(`order:${code}`);
+
+        if (orders[0].inventoryReserved) {
+            const mongoSession = await mongoose.startSession();
+            try {
+                await mongoSession.withTransaction(async () => {
+                    for (const order of orders) {
+                        await Product.updateOne(
+                            { _id: order.productId },
+                            {
+                                $inc: {
+                                    inventory: order.quantity,
+                                    reservedInventory: -order.quantity
+                                }
+                            },
+                            { session }
+                        );
+                    }
+                });
+            } catch (error) {
+                console.error(error);
+                try {
+                    await mongoSession.abortTransaction();
+                } catch (abortError) {
+                    console.error('Abort transaction error:', abortError);
+                }
+            } finally {
+                await mongoSession.endSession();
+            }
+        }
         await Order.updateMany({ code }, { status: "processing", payment: "cod" })
 
         res.status(200).json({ message: "Cash on delivery success. Please wait for merchant confirm.", isSuccess: true, })
 
     })
 ]
-
-
 
 exports.checkoutSuccess = [
     body("sessionId", "Invalid Session Id").notEmpty(),
@@ -659,7 +691,6 @@ exports.checkoutSuccess = [
 
         const { sessionId } = req.body;
 
-        // Retrieve session details
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
         if (!session) {
@@ -720,7 +751,8 @@ exports.checkoutSuccess = [
                 if (hasReservedInventory) {
                     // Inventory was reserved - just convert to sold
                     const inventoryOps = [];
-                    const merchantTotals = {};
+                    // const merchantTotals = {};
+                    const merchantData = {}
 
                     for (const order of orders) {
                         const product = productMap[order.productId.toString()];
@@ -741,10 +773,13 @@ exports.checkoutSuccess = [
 
                         // Calculate merchant earnings
                         if (product.merchant) {
-                            if (!merchantTotals[product.merchant]) {
-                                merchantTotals[product.merchant] = 0;
+                            if (!merchantData?.merchantId) {
+                                merchantData.amount = 0;
                             }
-                            merchantTotals[product.merchant] += order.quantity * product.price;
+                            merchantData.amount += order.quantity * product.price;
+                            merchantData.merchantId = product.merchant
+                            merchantData.customer = userId
+                            merchantData.orderCode = orderCode
                         }
                     }
 
@@ -754,12 +789,15 @@ exports.checkoutSuccess = [
                     }
 
                     // Update merchant balances
-                    await updateMerchantBalances(merchantTotals, mongoSession);
+                    await updateMerchantBalances(merchantData, mongoSession);
 
                 } else {
                     // No reservation - need to check and deduct inventory atomically
+                    console.log("hit 2");
+
                     const inventoryOps = [];
-                    const merchantTotals = {};
+                    // const merchantTotals = {};
+                    const merchantData = {}
 
                     for (const order of orders) {
                         const product = productMap[order.productId.toString()];
@@ -793,16 +831,19 @@ exports.checkoutSuccess = [
 
                         // Calculate merchant earnings for successful orders
                         if (product.merchant) {
-                            if (!merchantTotals[product.merchant]) {
-                                merchantTotals[product.merchant] = 0;
+                            if (!merchantData?.merchantId) {
+                                merchantData.amount = 0;
                             }
-                            merchantTotals[product.merchant] += order.quantity * product.price;
+                            merchantData.amount += order.quantity * product.price;
+                            merchantData.merchantId = product.merchant
+                            merchantData.customer = userId
+                            merchantData.orderCode = orderCode
                         }
                     }
 
                     // Update merchant balances only for successful orders
                     if (!shouldRefund) {
-                        await updateMerchantBalances(merchantTotals, mongoSession);
+                        await updateMerchantBalances(merchantData, mongoSession);
                     }
                 }
 
@@ -873,21 +914,49 @@ exports.checkoutSuccess = [
     }),
 ];
 
-// Helper function to update merchant balances
-async function updateMerchantBalances(merchantTotals, mongoSession) {
-    if (Object.keys(merchantTotals).length === 0) return;
+async function updateMerchantBalances(merchantData, mongoSession) {
+    if (Object.keys(merchantData).length === 0) return;
 
-    const merchantOps = Object.entries(merchantTotals).map(([merchantId, amount]) => ({
-        updateOne: {
-            filter: { _id: merchantId },
-            update: { $inc: { balance: amount } }
+    // const merchantOps = Object.entries(merchantTotals).map(([merchantId, amount]) => ({
+    //     updateOne: {
+    //         filter: { _id: merchantId },
+    //         update: { $inc: { balance: amount } }
+    //     }
+    // }));
+
+    const merchantOps = [
+        {
+            updateOne: {
+                filter: { _id: merchantData.merchantId },
+                update: { $inc: { balance: merchantData.amount } }
+            }
         }
-    }));
+    ];
 
     await Seller.bulkWrite(merchantOps, { session: mongoSession });
+
+    // console.log(merchantTotals);
+
+
+    const paymentHistoryOps = [
+        {
+            insertOne: {
+                document: {
+                    customer: merchantData.customer,
+                    paymentMethod: "stripe",
+                    amount: merchantData.amount,
+                    orderCode: merchantData.orderCode,
+                    merchant: merchantData.merchantId,
+                    status: "income"
+                }
+            }
+        }
+    ];
+
+    await PaymentHistory.bulkWrite(paymentHistoryOps, { session: mongoSession });
+
 }
 
-// Helper function to update zero inventory products
 async function updateZeroInventoryProducts(productIds, mongoSession) {
     const zeroInventoryProducts = await Product.find({
         _id: { $in: productIds },
@@ -906,7 +975,6 @@ async function updateZeroInventoryProducts(productIds, mongoSession) {
     }
 }
 
-// Helper function to process refunds
 async function processRefund(session, orderCode, refundReason) {
     try {
         const refund = await stripe.refunds.create({
@@ -948,7 +1016,6 @@ async function processRefund(session, orderCode, refundReason) {
     }
 }
 
-// Helper function to send confirmation email
 async function sendOrderConfirmationEmail(userId, orderCode) {
     try {
         const email = await getEmailContent({
