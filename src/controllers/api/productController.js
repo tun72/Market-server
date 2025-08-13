@@ -231,10 +231,14 @@ exports.getProductById = catchAsync(async (req, res, next) => {
     ]);
 
 
+
     if (!products.length) {
         return next(new AppError("Product Not found with that Id", 404));
     }
-    res.status(200).json({ message: "success", product: products[0] })
+    const product = products[0]
+
+    product.optimize_images = product.images.map((image) => image.split(".")[0] + ".webp")
+    res.status(200).json({ message: "success", product: product })
 })
 
 
