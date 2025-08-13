@@ -146,9 +146,6 @@ exports.deleteAd = [
         let data = req.body;
         const ads = await Ad.findById(data.id);
         if (!ads) {
-            if (req.files["image"]) {
-                removeImages([req.files["image"][0].filename])
-            }
             return next(new AppError("Seller not found", 409));
         }
 

@@ -140,7 +140,7 @@ const productSchema = new Schema({
 
 
 productSchema.virtual('optimize_images').get(function () {
-    return this.images.map((img) => img.split(".")[0] + ".webp")
+    return this?.images ? this.images.map((img) => img.split(".")[0] + ".webp") : undefined
 });
 
 typeSchema.virtual('categories', {

@@ -13,10 +13,32 @@ class ApiFeature {
 
     let queryStr = JSON.stringify(queryObj);
     queryStr = queryStr.replace(
-      /\b(gte|gt|lte|lt|regex)\b/g,
+      /\b(gte|gt|lte|lt|regex|or)\b/g,
       (match) => `$${match}`
     );
     let filter = JSON.parse(queryStr);
+
+
+
+    if (queryStr.indexOf("$or") > 0) {
+      const fields = Object.keys(filter["$or"])
+      const values = Object.values(filter["$or"])
+      // const fields = orKey.slice(4, -1).split(','); // ['sender', 'recipient']
+      // const values = queryObj[orKey].split(',');    // ['user1', 'user2']
+      // delete queryObj[orKey];
+
+      // console.log(fields, values);
+
+
+      if (fields.length === 2 && values.length === 2) {
+        filter["$or"] = [
+          { [fields[0]]: values[0], [fields[1]]: values[1] },
+          { [fields[0]]: values[1], [fields[1]]: values[0] }
+        ];
+      }
+
+
+    }
 
     if (queryStr.indexOf("$regex")) {
       for (let key in filter) {
@@ -26,6 +48,11 @@ class ApiFeature {
         }
       }
     }
+
+
+
+
+
 
     for (const [obj, key] of Object.entries(filter)) {
       if (
@@ -38,9 +65,15 @@ class ApiFeature {
     }
 
 
+
+    console.log(filter);
+
+
     try {
       this.query = this.query.find(filter);
     } catch (e) {
+      console.log(e);
+
       throw new AppError("Something went wrong please check", 400)
     }
 
