@@ -20,8 +20,7 @@ const paymentCategorySchema = new Schema({
     accNumber: {
         type: String,
         required: [true, "Account number is required"],
-        trim: true,
-        select: false
+        trim: true
     },
     accName: {
         type: String,
