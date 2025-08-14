@@ -248,11 +248,17 @@ exports.getPaymentMethodById = [
             next(new AppError("You'r not allowed this action."), 403)
         }
 
-        const isExist = await PaymentCategory.findOne({ merchant: merchant._id, _id: id })
+        console.log("hit");
+
+
+        const isExist = await PaymentCategory.findOne({ merchant: merchant.id, _id: new mongoose.Types.ObjectId(id) })
 
         if (!isExist) {
             next(new AppError("You'r not allowed this action", 403))
         }
+
+        console.log(isExist);
+
         next()
     }), factory.getOne({
         Model: PaymentCategory,
