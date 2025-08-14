@@ -30,7 +30,7 @@ exports.createType = [
             return next(new AppError(errors[0].msg, 400));
         }
 
-        let { link, company, product } = req.body;
+        let { name } = req.body;
         checkPhotoIfNotExistFields(req.files, ["image"])
 
         // need to create aws s3 
