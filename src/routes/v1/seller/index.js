@@ -53,7 +53,7 @@ router.route("/payments").get(paymentController.getPaymentMethod).
         { name: "QR", maxCount: 1 }
     ]), paymentController.updatePaymentMethod).delete(paymentController.deletePaymentMethod)
 
-router.get("/payment:id", paymentController.getPaymentMethodById)
+router.get("/payments/:id", paymentController.getPaymentMethodById)
 
 
 module.exports = router
