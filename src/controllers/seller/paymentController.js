@@ -95,6 +95,9 @@ exports.createPaymentMethod = [
             active: true
         }
 
+        console.log(data);
+
+
         await PaymentCategory.create(data)
         res.status(200).json({ message: "New Payment Method is successfully created", isSuccess: true })
     })
