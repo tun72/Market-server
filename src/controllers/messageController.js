@@ -63,6 +63,7 @@ exports.getContactForDMList = catchAsync(async (req, res, next) => {
                     },
                 },
                 lastMessageTime: { $first: "$timestamp" },
+                message: { $first: "$message" }
             },
         },
         {
@@ -81,8 +82,9 @@ exports.getContactForDMList = catchAsync(async (req, res, next) => {
                 _id: 1,
                 lastMessageTime: 1,
                 email: "$contactInfo.email",
-                username: "$contactInfo.username",
+                username: "$contactInfo.name",
                 image: "$contactInfo.image",
+                message: 1
             },
         },
         {
