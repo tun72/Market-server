@@ -1,16 +1,18 @@
-const { Schema, model } = require('mongoose');
+const mongoose = require('mongoose');
+const { Schema, model } = mongoose;
 const discProductSchema = new Schema({
-    productId: {
-        type: Schema.Types.ObjectId,
-        ref: 'Product',
+    value: {
+        type: Number,
         required: true
     },
-    discPercent: {
-        type: Number,
-        required: true,
-        min: 0,
-        max: 100
+    startDate: {
+        type: Date,
+        required: true
     },
+    endDate: {
+        type: Date,
+        required: true
+    }
 }, {
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
@@ -22,6 +24,6 @@ const discProductSchema = new Schema({
 //     foreignField: 'productId',
 //     localField: '_id'
 // });
-
-
 module.exports = model("Discount", discProductSchema)
+
+

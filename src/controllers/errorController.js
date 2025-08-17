@@ -8,5 +8,6 @@ module.exports = (err, req, res, next) => {
         .json({
             message: err?.message || "Some Error happen!",
             status: err?.status || "failed",
+            isSuccess: false
         });
 };

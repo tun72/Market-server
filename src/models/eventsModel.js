@@ -1,6 +1,7 @@
 const { Schema, model } = require('mongoose');
 const path = require('path');
-const fileDelete = require('../utils/fileDelete');
+const { fileDelete } = require('../utils/fileDelete');
+
 const eventSchema = new Schema({
     name: {
         type: String,
@@ -42,7 +43,10 @@ const eventSchema = new Schema({
         },
         eligibleCategories: [String]
     },
-}, { timestamps: true });
+}, {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
 
 
 const participantSchema = new Schema({
@@ -65,18 +69,32 @@ const participantSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: "Discount"
     }]
-}, { timestamps: true });
+}, {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
 
 
+eventSchema.virtual('discount').get(function () {
+    if (
+        this.discountRules &&
+        typeof this.discountRules.maxPercentage === 'number'
+    ) {
+        return `Up To ${this.discountRules.maxPercentage}%`;
+    }
+    return "Up to 0%";
+});
 
 
 eventSchema.pre('findOneAndDelete', async function () {
     const doc = await this.model.findOne(this.getFilter()).lean();
     if (!doc || !doc.poster) return;
-
-    const filePath = path.join(__dirname, '../public', doc.poster);
+    const filePath = path.join(__dirname, '../../uploads', doc.poster);
     await fileDelete(filePath);
 });
+
+
+
 
 module.exports = {
     Event: model('Event', eventSchema),

@@ -8,7 +8,7 @@ const getAllCategoriesController = async (_, res) => {
 
   return res
     .status(200)
-    .json({ message: "Get All Categories Successfully!", data: categories });
+    .json({ message: "Get All Categories Successfully!", data: categories, isSuccess: true });
 };
 
 const createCategoriesController = async (req, res) => {
@@ -22,7 +22,7 @@ const createCategoriesController = async (req, res) => {
 
     return res
       .status(201)
-      .json({ message: "Category created successfully", category: category });
+      .json({ message: "Category created successfully", category: category, isSuccess: true });
   } catch (ex) {
     return res.status(500).json({ message: "Internal Server Error" });
   }

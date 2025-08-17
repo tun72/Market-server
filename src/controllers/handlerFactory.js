@@ -6,6 +6,16 @@ const mongoose = require("mongoose");
 exports.getAll = ({ Model, fields = [] }) =>
     catchAsync(async (req, res, next) => {
         let filter = {};
+
+        // if (req.filter) {
+        //     filter = req.filter;
+        // }
+        const page = req.query.page * 1 || 1;
+        const filteredQuery = new ApiFeature(Model.find(filter), req.query).filter();
+        const length = await filteredQuery.query.countDocuments();
+        const limit = req.query.limit * 1 || 100;
+
+
         const feature = new ApiFeature(Model.find(filter), req.query)
             .filter()
             .sort()
@@ -14,11 +24,16 @@ exports.getAll = ({ Model, fields = [] }) =>
             .populate(fields);
 
         let doc = await feature.query;
-
         return res.status(200).json({
             status: "sucess",
-            results: doc.length,
             data: doc,
+            isSuccess: true,
+            pagination: {
+                entriesPerPage: limit,
+                page,
+                totalResult: length,
+                foundResult: doc.length,
+            }
         });
     });
 
@@ -40,9 +55,8 @@ exports.getOne = ({ Model, fields = [] }) =>
 
         res.status(200).json({
             status: "success",
-            data: {
-                data: doc,
-            },
+            data: doc,
+            isSuccess: true
         });
     });
 
@@ -54,9 +68,8 @@ exports.createOne = Model =>
 
         res.status(201).json({
             status: "success",
-            data: {
-                data: doc
-            }
+            data: doc,
+            isSuccess: true
         })
     })
 
@@ -74,9 +87,8 @@ exports.updateOne = Model =>
 
         return res.status(200).json({
             status: "success",
-            data: {
-                data: doc
-            }
+            data: doc,
+            isSuccess: true
         })
     })
 
@@ -91,6 +103,6 @@ exports.deleteOne = Model => catchAsync(async (req, res, next) => {
 
     return res.status(204).json({
         status: "success",
-        data: null
+        isSuccess: true
     })
 })

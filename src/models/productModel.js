@@ -1,10 +1,10 @@
 const { Schema, model } = require('mongoose');
 const { ObjectId } = Schema.Types;
 
-const isValidURL = (v) => /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/.test(v);
 
 const typeSchema = new Schema({
     name: { type: String, required: true, unique: true },
+    image: { type: String, required: true }
 });
 
 
@@ -76,28 +76,33 @@ const productSchema = new Schema({
     }],
     images: [{
         type: String,
-        required: true
+        required: true,
     }],
     price: {
         type: Number,
         required: [true, 'Product price is required'],
     },
     discount: {
-        type: Number,
-        default: 0
+        type: ObjectId,
+        ref: "discount"
     },
     inventory: {
         type: Number,
         required: [true, "Inventory is required"]
     },
+
     shipping: { type: Number, min: 0, default: 0 },
     status: {
         type: String,
         enum: {
-            values: ['draft', "pending", 'active', 'archived'],
+            values: ['draft', 'active', 'archived', "out_of_stock"],
             message: 'Invalid product status'
         },
-        default: 'draft'
+        default: 'active'
+    },
+    isFeatured: {
+        type: Boolean,
+        default: false
     },
     // optional
     // warranty: {
@@ -117,6 +122,8 @@ const productSchema = new Schema({
         ref: 'User',
         required: [true, 'Merchant reference is required'],
     },
+    reservedInventory: { type: Number, default: 0 },
+    soldCount: { type: Number, default: 0 },
 }, {
     timestamps: true,
     toJSON: {
@@ -131,6 +138,12 @@ const productSchema = new Schema({
     toObject: { virtuals: true }
 });
 
+
+productSchema.virtual('optimize_images').get(function () {
+    console.log("hit");
+
+    return this?.images ? this.images.map((img) => img.split(".")[0] + ".webp") : undefined
+});
 
 typeSchema.virtual('categories', {
     ref: 'Type',

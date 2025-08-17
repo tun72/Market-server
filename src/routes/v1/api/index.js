@@ -1,17 +1,64 @@
 const express = require("express");
 const router = express.Router();
-// const sellerController = require("../controllers/sellerController");
-// const authMiddleware = require("../middlewares/authMiddleware");
+const productController = require("../../../controllers/api/productController")
+const cartController = require("../../../controllers/api/cartContoller");
+const orderController = require("../../../controllers/api/orderController");
+const adsController = require("../../../controllers/api/adsController");
+const merchantController = require("../../../controllers/api/merchantController");
+const authMiddleware = require("../../../middlewares/authMiddleware");
+const authorise = require("../../../middlewares/authoriseMiddleware");
 
-// router.use(authMiddleware)
 
-// router.get("/events", sellerController.getAllEvents)
+//events
+router.get("/events", productController.getAllEvents)
 
-// router.post("/events/join", sellerController.joinEvent)
-// router.post("/events/discount-produects", sellerController.addDiscount)
+// products
+router.get("/products/featured", productController.getFeaturedProducts)
+// router.get("/related-products/:productId", productController.getRelatedProduct)
+router.get("/products", productController.getAllProducts)
+router.get("/products/search", productController.searchQueryProducts)
+router.get("/products/:id", productController.getProductById)
 
-// router.get("/events/:id", sellerController.getEventById)
+// types
+router.get("/popular-types", productController.getPopularTypes)
+router.get("/types", productController.getAllTypes)
+router.get("/categories", productController.getAllCategories)
+router.get("/categories/:id", productController.getCategories)
 
-// router.get("/participants/:id", sellerController.getParticipant)
+//merchants
+router.get("/merchants", merchantController.getAllMerchants)
+router.get("/merchants/:id", merchantController.getMerchantById)
+
+router.get("/ads", adsController.getAllAds)
+
+
+// order
+router.use(authMiddleware, authorise(true, "customer"))
+router.post("/cart", cartController.addToCart)
+router.delete("/cart", cartController.deleteCart)
+router.get("/cart", cartController.getCart)
+router.patch("/cart", cartController.updateCart)
+
+// shipping
+router.get("/shipping", cartController.getCart)
+
+
+//order
+router.post("/order", orderController.createOrder)
+
+// checkout
+router.post("/create-checkout-session", orderController.createCheckoutSession);
+
+router.post("/checkout-success", orderController.checkoutSuccess);
+
+router.post("/cash-on-delivery", orderController.cashOnDelivery);
+
+router.get("/orders", orderController.getOrders)
+router.get("/orders/:code", orderController.getOrderByCode)
+
+
+// ads
+
+
 
 module.exports = router

@@ -1,44 +1,97 @@
 const jwt = require("jsonwebtoken");
 const { promisify } = require("util")
-const { User } = require("../models/userModel");
+const dotenv = require("dotenv");
 const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
+const User = require("../models/userModel");
+const { generateAccessToken, generateRefreshToken } = require("../utils/generateToken");
+const Admin = require("../models/adminModel");
+dotenv.config()
 
 const authMiddleware = catchAsync(async (req, res, next) => {
-    let token;
+    let accessToken;
     if (
         req.headers.authorization &&
         req.headers.authorization.startsWith("Bearer")
     ) {
-        token = req.headers.authorization.split(" ")[1];
+        accessToken = req.headers.authorization.split(" ")[1];
     }
 
-    if (!token) {
-        return next(
-            new AppError("You are not logged in! Please log in to get access.", 401)
-        );
+    async function generateNewToken() {
+        const refreshToken = req.cookies ? req.cookies.refreshToken : null;
+
+        if (!refreshToken) {
+            return next(
+                new AppError("You are not authenticated user! Please log in to get access.", 401)
+            );
+        }
+        try {
+            const decoded = await promisify(jwt.verify)(refreshToken, process.env.SECRET_KEY);
+
+            const user = await User.findById(decoded.id).select("+randToken")
+
+            if (!user) {
+                return next(new AppError("You are not an authenticated user."), 401)
+            }
+
+            if (user.email !== decoded.email) {
+                return next(new AppError("You are not an authenticated user."), 401)
+            }
+
+            if (user.randToken !== refreshToken) {
+                return next(new AppError("You are not an authenticated user.", 401))
+            }
+
+            const accessToken_new = await generateAccessToken({ id: user.id });
+            const refreshToken_new = await generateRefreshToken({ id: user.id, email: user.email });
+
+            await User.findByIdAndUpdate(user._id, { randToken: refreshToken_new });
+            res
+                .cookie("accessToken", accessToken_new, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+                    maxAge: 15 * 60 * 1000,
+                })
+                .cookie("refreshToken", refreshToken_new, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+                    maxAge: 30 * 24 * 60 * 60 * 1000,
+                })
+            req.userId = user._id
+            next()
+
+        } catch (error) {
+            return next(new AppError("You are not authenticated.", 401));
+        }
+
     }
 
-    // 2) Verification token
-    const decoded = await promisify(jwt.verify)(token, process.env.SECRET_KEY);
+    if (!accessToken) {
+        // console.log("not access");
+        // open when frontend is on server
+        // generateNewToken()
+        return next(new AppError("Access Token is Invalid.", 401));
+    } else {
+        try {
+            const decoded = await promisify(jwt.verify)(accessToken, process.env.SECRET_KEY);
+            req.userId = decoded.id;
+            next()
 
-    // 3) Check if user still exists
-    const currentUser = await User.findById(decoded.id);
+        } catch (error) {
+            console.log(error);
 
-    console.log(currentUser);
-
-    if (!currentUser) {
-        return next(
-            new AppError(
-                "The user belonging to this token does no longer exist.",
-                401
-            )
-        );
+            if (error.name === "TokenExpiredError") {
+                // open when frontend is on server
+                // generateNewToken()
+                return next(new AppError("Access Tokeni is expired.", 401));
+            } else {
+                return next(new AppError("Access Token is Invalid.", 401));
+            }
+        }
     }
-    // GRANT ACCESS TO PROTECTED ROUTE
-    req.user = currentUser;
-
-    next();
-})
+}
+)
 
 module.exports = authMiddleware;

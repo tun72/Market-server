@@ -1,3 +1,5 @@
+const AppError = require("./appError");
+
 class ApiFeature {
   constructor(query, queryString) {
     this.query = query;
@@ -11,10 +13,32 @@ class ApiFeature {
 
     let queryStr = JSON.stringify(queryObj);
     queryStr = queryStr.replace(
-      /\b(gte|gt|lte|lt|regex)\b/g,
+      /\b(gte|gt|lte|lt|regex|or)\b/g,
       (match) => `$${match}`
     );
     let filter = JSON.parse(queryStr);
+
+
+
+    if (queryStr.indexOf("$or") > 0) {
+      const fields = Object.keys(filter["$or"])
+      const values = Object.values(filter["$or"])
+      // const fields = orKey.slice(4, -1).split(','); // ['sender', 'recipient']
+      // const values = queryObj[orKey].split(',');    // ['user1', 'user2']
+      // delete queryObj[orKey];
+
+      // console.log(fields, values);
+
+
+      if (fields.length === 2 && values.length === 2) {
+        filter["$or"] = [
+          { [fields[0]]: values[0], [fields[1]]: values[1] },
+          { [fields[0]]: values[1], [fields[1]]: values[0] }
+        ];
+      }
+
+
+    }
 
     if (queryStr.indexOf("$regex")) {
       for (let key in filter) {
@@ -24,7 +48,34 @@ class ApiFeature {
         }
       }
     }
-    this.query = this.query.find(filter);
+
+
+
+
+
+
+    for (const [obj, key] of Object.entries(filter)) {
+      if (
+        (typeof key === "object" && Object.keys(key).length === 0) ||
+        key === "" ||
+        key == null
+      ) {
+        delete filter[obj];
+      }
+    }
+
+
+
+    console.log(filter);
+
+
+    try {
+      this.query = this.query.find(filter);
+    } catch (e) {
+      console.log(e);
+
+      throw new AppError("Something went wrong please check", 400)
+    }
 
     return this;
   }
@@ -48,7 +99,6 @@ class ApiFeature {
     }
     return this;
   }
-
   paginate() {
 
     const page = this.queryString.page * 1 || 1;
@@ -59,13 +109,31 @@ class ApiFeature {
 
     return this;
   }
-
   populate(fields) {
     if (this.queryString.fields) return this;
 
     this.query = this.query.populate(`${fields.join(" ")}`);
 
     return this;
+  }
+  custom() {
+    if (this.queryString.query === "today") {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+
+      // Filter documents created today
+      this.query = this.query.find({
+        createdAt: {
+          $gte: startOfToday,
+          $lte: endOfToday
+        }
+      });
+    }
+
+    return this
   }
 }
 
