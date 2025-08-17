@@ -41,6 +41,9 @@ router.patch("/orders/update", orderController.updateOrders)
 
 // dashboard
 router.get("/status", dashboardController.getStatus)
+router.get("/revenue-order-chart", dashboardController.getRevenueAndOrderChart)
+router.get("/type-chart", dashboardController.getTypeChart)
+
 
 //payment hostory
 router.get("/payment-history", paymentController.getAllPaymentHistory)
@@ -54,6 +57,9 @@ router.route("/payments").get(paymentController.getPaymentMethod).
     ]), paymentController.updatePaymentMethod).delete(paymentController.deletePaymentMethod)
 
 router.get("/payments/:id", paymentController.getPaymentMethodById)
+
+router.get("/withdraw", paymentController.getAllWithDraw)
+router.post("/withdraw", paymentController.withDraw)
 
 
 module.exports = router

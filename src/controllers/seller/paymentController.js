@@ -1,7 +1,7 @@
 // history
 const { body, param, validationResult } = require("express-validator");
 const { resume } = require("../../jobs/queues/ImageQueue");
-const { PaymentHistory, PaymentCategory } = require("../../models/paymentCategoryModel");
+const { PaymentHistory, PaymentCategory, Withdraw } = require("../../models/paymentCategoryModel");
 const Seller = require("../../models/sellerModel");
 const AppError = require("../../utils/appError");
 const catchAsync = require("../../utils/catchAsync");
@@ -271,26 +271,84 @@ exports.getPaymentMethodById = [
 
 
 // withdraw
-// exports.withDraw = [
-//     body("id", "Id is required.").custom((id) => {
-//         return mongoose.Types.ObjectId.isValid(id);
-//     }),
-//     catchAsync(async (req, res, next) => {
-//         const errors = validationResult(req).array({ onlyFirstError: true });
-//         if (errors.length) {
-//             return next(new AppError(errors[0].msg, 400));
-//         }
+exports.withDraw = [
+    body("paymentMethodId", "Accept Payment Method Id is required.").custom((id) => {
+        return mongoose.Types.ObjectId.isValid(id);
+    }),
+    body("amount", "PAYMENT INSUFFICIENT").isFloat({ min: 0, max: 1000000 }),
+    catchAsync(async (req, res, next) => {
+        const errors = validationResult(req).array({ onlyFirstError: true });
+        if (errors.length) {
+            return next(new AppError(errors[0].msg, 400));
+        }
 
-//         let data = req.body;
-//         const paymentMethod = await PaymentCategory.findById(data.id);
-//         if (!paymentMethod) {
-//             return next(new AppError("Payment not found", 409));
-//         }
+        const userId = req.userId;
+        const merchant = await Seller.findById(userId)
+        if (!merchant) {
+            next(new AppError("You'r not allowed this action."), 403)
+        }
 
-//         const originalFiles = [paymentMethod.QR];
-//         const optimizeFiles = originalFiles.map((file) => file.split(".")[0] + ".webp")
-//         await removeImages(originalFiles, optimizeFiles);
-//         await PaymentCategory.findByIdAndDelete(paymentMethod._id)
-//         res.status(200).json({ message: "Payment Method is successfully deleted", isSuccess: true })
 
-//     })]
+        let data = req.body;
+        const paymentMethod = await PaymentCategory.findById(data.paymentMethodId);
+        if (!paymentMethod) {
+            return next(new AppError("Payment not found", 409));
+        }
+
+        if (data.amount <= 0) {
+            return next(new AppError("INVALID_PAYMENT_AMOUNT", 400));
+        }
+
+        if (data.amount > merchant.amount) {
+            return next(new AppError("PAYMENT_INSUFFICIENT_FUNDS", 402));
+        }
+
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const withDrawCount = await Withdraw.countDocuments({
+            merchant: merchant.id,
+            createdAt: { $gte: startOfDay, $lte: endOfDay }
+        });
+
+        if (withDrawCount >= 3) {
+            return next(
+                new AppError("You can withdraw 3 times per day. Please come back tomorrow.", 429)
+            );
+        }
+
+        await Withdraw.create({
+            merchant: merchant.id,
+            paymentCategory: paymentMethod._id,
+            amount: data.amount
+        })
+
+        // await PaymentHistory.create({
+        //     merchant: merchant.id,
+        //     paymentMethod: paymentMethod.pyMethod,
+        //     amount: data.amount,
+        //     status: "withdraw"
+        // })
+
+        return res.status(200).json({ isSuccess: true, message: "WithDraw created Successfully. Please wait for admin confirm." })
+    })]
+
+exports.getAllWithDraw = [
+    catchAsync(async (req, res, next) => {
+        const userId = req.userId;
+        const merchant = await Seller.findById(userId)
+        if (!merchant) {
+            next(new AppError("You'r not allowed this action."), 403)
+        }
+        req.query = {
+            merchant: merchant.id
+        }
+        next()
+    }), factory.getAll({
+        Model: Withdraw,
+        fields: ["paymentCategory",],
+    })
+]
