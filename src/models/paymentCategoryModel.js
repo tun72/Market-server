@@ -64,8 +64,11 @@ const withDrawSchema = new Schema({
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending'
     },
-
-    transactionId: String,
+    paymentCategory: {
+        type: ObjectId,
+        ref: "PaymentCategory",
+        required: [true, "Accept Payment Method is required."]
+    },
     processedAt: Date
 }, {
     timestamps: true,
@@ -76,19 +79,15 @@ const withDrawSchema = new Schema({
 const paymentHistory = new Schema({
     customer: {
         type: ObjectId,
-        required: true
     },
     merchant: {
         type: ObjectId,
-        required: true
+        required: true,
+        ref: 'Seller',
     },
     paymentMethod: {
         type: String,
         required: [true, "Payment method type is required"],
-        enum: {
-            values: ['stripe'],
-            message: "Invalid payment method type"
-        }
     },
     amount: {
         type: Number,
@@ -96,7 +95,6 @@ const paymentHistory = new Schema({
     },
     orderCode: {
         type: String,
-        required: true
     },
     status: {
         type: String,
@@ -105,7 +103,6 @@ const paymentHistory = new Schema({
             values: ['income', "withdraw"],
             message: "Invalid status"
         }
-
     }
 }, {
     timestamps: true,
@@ -114,13 +111,13 @@ const paymentHistory = new Schema({
 })
 
 
-withDrawSchema.pre('save', async function (next) {
-    const seller = await model('Seller').findById(this.seller);
-    if (seller.amount < this.amount) {
-        return next(new Error('Insufficient balance for withdrawal'));
-    }
-    next();
-});
+// withDrawSchema.pre('save', async function (next) {
+//     const seller = await model('Seller').findById(this.seller);
+//     if (seller.amount < this.amount) {
+//         return next(new Error('Insufficient balance for withdrawal'));
+//     }
+//     next();
+// });
 
 module.exports = {
     PaymentHistory: model("PaymentHistory", paymentHistory),
