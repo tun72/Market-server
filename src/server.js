@@ -10,7 +10,6 @@ const dotenv = require("dotenv");
 const routes = require("./routes/v1/index");
 const Admin = require("./models/adminModel");
 const { generateRandToken } = require("./utils/generateToken");
-const tf = require('@tensorflow/tfjs-node');
 
 dotenv.config();
 
