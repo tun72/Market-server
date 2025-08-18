@@ -6,12 +6,14 @@ const Admin = require("../models/adminModel");
 const AppError = require("../utils/appError");
 exports.aliasMessages = (req, res, next) => {
     const user1 = req.userId;
+
+    const id = req.body.id
+    if (!id) {
+        next(new AppError("Id is required."))
+    }
     const user2 = req.body.id;
-
-
     req.query.sort = "timestamp";
     req.query.or = { sender: user1, recipient: user2 }
-
     next();
 };
 
