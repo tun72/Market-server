@@ -10,6 +10,7 @@ const dotenv = require("dotenv");
 const routes = require("./routes/v1/index");
 const Admin = require("./models/adminModel");
 const { generateRandToken } = require("./utils/generateToken");
+const tf = require('@tensorflow/tfjs-node');
 
 dotenv.config();
 
@@ -48,6 +49,8 @@ if (process.env.NODE_ENV === "development") {
 app.use(routes)
 app.use(globalErrorController);
 
+
+
 const PORT = process.env.PORT || 3000;
 mongoose
   .connect(process.env.MONGODB_URL)
@@ -62,6 +65,7 @@ mongoose
     return admin
   }).then(() => {
     console.log("database successfully connected ✅");
+
     const server = app.listen(PORT, () => {
       console.log("Server is running at http://localhost:" + PORT);
     });

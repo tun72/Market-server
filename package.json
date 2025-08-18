@@ -14,11 +14,13 @@
     "work": "nodemon src/jobs/workers/ImageWorker.js",
     "order": "nodemon src/jobs/workers/OrderWorker.js",
     "mail": "nodemon src/jobs/workers/EmailWorker.js",
-    "scrape": "node ./scrape/productScrape.js"
+    "train": "node scripts/train_model.js",
+    "extract-features": "node scripts/extract_features.js"
   },
   "author": "tun72",
   "license": "ISC",
   "dependencies": {
+    "@tensorflow/tfjs-node": "^4.22.0",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "body-parser": "^1.20.2",
@@ -26,7 +28,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
-    "csurf": "^1.11.0",
+    "csurf": "^1.2.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.18.2",
