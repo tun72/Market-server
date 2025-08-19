@@ -61,5 +61,8 @@ router.get("/payments/:id", paymentController.getPaymentMethodById)
 router.get("/withdraw", paymentController.getAllWithDraw)
 router.post("/withdraw", paymentController.withDraw)
 
+// category
+router.get("/categories", productController.getAllCategories)
+
 
 module.exports = router

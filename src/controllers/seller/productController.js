@@ -8,7 +8,7 @@ const ImageQueue = require("../../jobs/queues/ImageQueue");
 
 const { createOrConnectCategory } = require("../../services/categoryService");
 const { getTypeByName } = require("../../services/typeService");
-const { Product } = require("../../models/productModel");
+const { Product, Category } = require("../../models/productModel");
 const mongoose = require("mongoose")
 const factory = require("../handlerFactory");
 const { removeImages } = require("../../utils/fileDelete");
@@ -671,3 +671,10 @@ exports.deleteProduct = [
 
     })
 ]
+
+
+// category
+exports.getAllCategories = factory.getAll({
+    Model: Category
+})
+
