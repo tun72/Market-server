@@ -352,3 +352,14 @@ exports.getAllWithDraw = [
         fields: ["paymentCategory",],
     })
 ]
+
+
+// total amount
+exports.getTotalAmount = catchAsync(async (req, res, next) => {
+    const userId = req.userId;
+    const merchant = await Seller.findById(userId).select("+balance")
+    if (!merchant) {
+        next(new AppError("You'r not allowed this action."), 403)
+    }
+    return res.status(200).json({ isSuccess: true, totalAmount: merchant.balance })
+})
