@@ -231,7 +231,8 @@ exports.deleteImage = [
         );
         res.status(200).json({
             message: "Image successfully deleted.",
-            remainingImages: updatedImages.length
+            remainingImages: updatedImages.length,
+            isSuccess: true
         });
     })
 ];
@@ -667,7 +668,7 @@ exports.deleteProduct = [
 
         await Product.findByIdAndDelete(product._id)
 
-        res.status(200).json({ message: "Product successfully deleted." })
+        res.status(200).json({ message: "Product successfully deleted.", isSuccess: true })
 
     })
 ]
