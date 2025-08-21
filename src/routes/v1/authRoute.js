@@ -110,7 +110,7 @@ router.get(
         }
 
         const encryptData = await encrypt(data);
-        res.redirect(process.env.FRONTEND_URL + "/?token=" + encryptData.encryptedData);
+        res.redirect(process.env.FRONTEND_URL + "/login?token=" + encodeURIComponent(encryptData.encryptedData));
     }
 );
 
