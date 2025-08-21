@@ -18,7 +18,7 @@ exports.updateStatus = catchAsync(async (req, res, next) => {
         runValidators: true
     })
 
-    return res.status(200).json({ message: "sucess" })
+    return res.status(200).json({ message: "sucess", isSuccess: true })
 })
 
 

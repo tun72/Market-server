@@ -22,7 +22,7 @@ const authMiddleware = catchAsync(async (req, res, next) => {
 
         if (!refreshToken) {
             return next(
-                new AppError("You are not authenticated user! Please log in to get access.", 401)
+                new AppError("You are not authenticated user! Please log in to get access.", 403)
             );
         }
         try {
@@ -31,15 +31,15 @@ const authMiddleware = catchAsync(async (req, res, next) => {
             const user = await User.findById(decoded.id).select("+randToken")
 
             if (!user) {
-                return next(new AppError("You are not an authenticated user."), 401)
+                return next(new AppError("You are not an authenticated user."), 403)
             }
 
             if (user.email !== decoded.email) {
-                return next(new AppError("You are not an authenticated user."), 401)
+                return next(new AppError("You are not an authenticated user."), 403)
             }
 
             if (user.randToken !== refreshToken) {
-                return next(new AppError("You are not an authenticated user.", 401))
+                return next(new AppError("You are not an authenticated user.", 403))
             }
 
             const accessToken_new = await generateAccessToken({ id: user.id });
@@ -63,7 +63,7 @@ const authMiddleware = catchAsync(async (req, res, next) => {
             next()
 
         } catch (error) {
-            return next(new AppError("You are not authenticated.", 401));
+            return next(new AppError("You are not authenticated.", 403));
         }
 
     }
@@ -72,7 +72,7 @@ const authMiddleware = catchAsync(async (req, res, next) => {
         // console.log("not access");
         // open when frontend is on server
         // generateNewToken()
-        return next(new AppError("Access Token is Invalid.", 401));
+        return next(new AppError("Access Token is Invalid.", 403));
     } else {
         try {
             const decoded = await promisify(jwt.verify)(accessToken, process.env.SECRET_KEY);
@@ -85,9 +85,9 @@ const authMiddleware = catchAsync(async (req, res, next) => {
             if (error.name === "TokenExpiredError") {
                 // open when frontend is on server
                 // generateNewToken()
-                return next(new AppError("Access Tokeni is expired.", 401));
+                return next(new AppError("Access Tokeni is expired.", 403));
             } else {
-                return next(new AppError("Access Token is Invalid.", 401));
+                return next(new AppError("Access Token is Invalid.", 403));
             }
         }
     }

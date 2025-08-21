@@ -14,7 +14,7 @@ router.post("/signin/admin-merchant", authController.adminSignIn)
 router.post("/signin", authController.signIn);
 router.post("/signup", authController.signUp);
 const Customer = require("../../models/customerModel");
-const { generateAccessToken } = require("../../utils/generateToken");
+const { generateAccessToken, generateRandToken } = require("../../utils/generateToken");
 const { encrypt } = require("../../utils/encryptData");
 const OAuth2Strategy = require("passport-google-oauth2").Strategy;
 
@@ -87,7 +87,6 @@ router.get(
 router.get(
     "/google/callback", passport.authenticate("google", { failureRedirect: "/login" }),
     async (req, res, next) => {
-        // `req.user` should be available after authentication
         const user = req.user;
 
         if (!user) {
@@ -95,8 +94,6 @@ router.get(
         }
 
         const accessToken = await generateAccessToken({ id: user.id });
-
-
 
         const data = {
             isSuccess: true,
@@ -113,7 +110,7 @@ router.get(
         }
 
         const encryptData = await encrypt(data);
-        res.redirect(process.env.FRONTEND_URL + "/user?token=" + encryptData.encryptedData);
+        res.redirect(process.env.FRONTEND_URL + "/?token=" + encryptData.encryptedData);
     }
 );
 

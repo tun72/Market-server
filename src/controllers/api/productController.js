@@ -300,7 +300,7 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
 
     // console.log(products);
 
-    return res.status(200).json({ message: "sucess", products })
+    return res.status(200).json({ message: "sucess", products, isSuccess: true })
 })
 
 exports.searchQueryProducts = catchAsync(async (req, res, next) => {
@@ -336,7 +336,7 @@ exports.getRelatedProduct = catchAsync(async (req, res, next) => {
     const products = await Product.aggregate([
         { $match: { _id: productId } },
     ])
-    res.status(200).json({ message: "success", products })
+    res.status(200).json({ message: "success", products, isSuccess: true })
 })
 
 // top types 

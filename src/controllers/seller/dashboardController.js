@@ -182,7 +182,7 @@ exports.getStatus = catchAsync(async (req, res) => {
         };
 
         res.json({
-            success: true,
+            isSuccess: true,
             ...stats,
             timestamp: new Date().toISOString()
         });
@@ -190,7 +190,7 @@ exports.getStatus = catchAsync(async (req, res) => {
     } catch (error) {
         console.error('Error fetching dashboard stats:', error);
         res.status(500).json({
-            success: false,
+            isSuccess: false,
             message: 'Error fetching dashboard statistics',
             error: error.message
         });
