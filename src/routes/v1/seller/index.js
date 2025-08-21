@@ -48,6 +48,8 @@ router.get("/type-chart", dashboardController.getTypeChart)
 //payment hostory
 router.get("/payment-history", paymentController.getAllPaymentHistory)
 
+router.get("/total-amount", paymentController.getTotalAmount)
+
 router.route("/payments").get(paymentController.getPaymentMethod).
     post(upload.fields([
         { name: "QR", maxCount: 1 }
