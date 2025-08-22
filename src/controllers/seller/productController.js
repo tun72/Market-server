@@ -412,6 +412,7 @@ exports.updateProduct = [
         }),
     body("brand", "Brand is invalid.").trim().optional({ nullable: true }),
     body("shipping", "Shipping is invalid").isInt({ gt: 0 }).optional(),
+    body("isFeatured").optional(),
     body("update_images", "Update images format is invalid")
         .optional({ nullable: true })
         .customSanitizer((value) => {
@@ -428,7 +429,7 @@ exports.updateProduct = [
             return value;
         })
         .custom((value) => {
-            console.log(value);
+
 
             if (!value) return true;
 
@@ -482,7 +483,7 @@ exports.updateProduct = [
             return next(new AppError(errors[0].msg, 400));
         }
 
-        let { productId, name, body, description, price, discount, shipping, type, category, tags, colors, sizes, brand, inventory, update_images } = req.body;
+        let { productId, name, body, description, isFeatured, price, discount, shipping, type, category, tags, colors, sizes, brand, inventory, update_images } = req.body;
 
         body = decode(body)
         const product = await Product.findById(productId)
@@ -514,6 +515,7 @@ exports.updateProduct = [
             brand,
             inventory,
             shipping,
+            isFeatured,
         }
 
         // Handle image updates
