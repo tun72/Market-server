@@ -65,7 +65,8 @@ router.route("/events/:id").put(
 
 router.route("/ads").get(adController.getAllAds).
     post(upload.fields([
-        { name: "image", maxCount: 1 }
+        { name: "image", maxCount: 1 },
+        { name: "companyImg", maxCount: 1 },
     ]), adController.createAd)
     .patch(upload.fields([
         { name: "image", maxCount: 1 }
@@ -76,10 +77,11 @@ router.get("/ads/:id", adController.getADsById)
 // types
 router.route("/types").get(typeController.getAllTypes).
     post(upload.fields([
-        { name: "image", maxCount: 1 }
+        { name: "image", maxCount: 1 },
+
     ]), typeController.createType)
     .patch(upload.fields([
-        { name: "image", maxCount: 1 }
+        { name: "image", maxCount: 1 },
     ]), typeController.updateType).delete(typeController.deleteType)
 
 router.get("/types/:id", typeController.getTypesById)

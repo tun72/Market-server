@@ -12,6 +12,10 @@ const adsSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    companyImg: {
+        type: String,
+        required: true,
+    },
 
 });
 

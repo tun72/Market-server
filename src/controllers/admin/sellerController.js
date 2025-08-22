@@ -33,7 +33,7 @@ exports.getSellerById = [
             next(new AppError("You'r not allowed this action.", 403))
         }
 
-        const seller = await Seller.findById(id).select("+NRCBack +NRCFront")
+        const seller = await Seller.findById(id).select("+NRCBack +NRCFront +NRCNumber")
 
         if (!seller) {
             next(new AppError("No seller found with that id.", 400))
