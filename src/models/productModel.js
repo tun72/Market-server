@@ -5,6 +5,9 @@ const { ObjectId } = Schema.Types;
 const typeSchema = new Schema({
     name: { type: String, required: true, unique: true },
     image: { type: String, required: true }
+}, {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
 
@@ -149,6 +152,10 @@ typeSchema.virtual('categories', {
     ref: 'Type',
     localField: '_id',
     foreignField: 'typeId'
+});
+
+typeSchema.virtual('optimize_images').get(function () {
+    return this?.image ? this.image.split(".")[0] + ".webp" : undefined
 });
 
 

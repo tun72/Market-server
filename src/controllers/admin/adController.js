@@ -27,42 +27,51 @@ exports.createAd = [
                 removeImages(originalFiles)
             }
 
+            if (req.files["companyImg"] && req.files["companyImg"].length > 0) {
+                const originalFiles = [req.files["image"][0].filename]
+                removeImages(originalFiles)
+            }
+
 
             return next(new AppError(errors[0].msg, 400));
         }
 
         let { link, company, product } = req.body;
-        checkPhotoIfNotExistFields(req.files, ["image"])
+        checkPhotoIfNotExistFields(req.files, ["image", "companyImg"])
 
         // need to create aws s3 
         // image optimize
 
-        const splitName = req.files["image"][0].filename.split(".")[0] + ".webp"
-        await ImageQueue.add("optimize-image", {
-            filePath: req.files["image"][0].path,
-            fileName: splitName,
-            width: 835,
-            height: 577,
-            quality: 100,
-        }, {
-            attempts: 3,
-            backoff: {
-                type: "exponential",
-                delay: 1000,
-            },
-        })
+        const fileNames = ["image", "companyImg"]
+        await Promise.all(fileNames.map(async (file) => {
+            const splitName = req.files[file][0].filename.split(".")[0] + ".webp"
+            await ImageQueue.add("optimize-image", {
+                filePath: req.files[file][0].path,
+                fileName: splitName,
+                width: 835,
+                height: 577,
+                quality: 100,
+            }, {
+                attempts: 3,
+                backoff: {
+                    type: "exponential",
+                    delay: 1000,
+                },
+            })
+        }))
 
 
         const image = req.files["image"][0].filename
+        const companyImg = req.files["companyImg"][0].filename
 
 
-        console.log(image);
 
         const data = {
             link: decode(link),
             image,
             company,
-            product
+            product,
+            companyImg
         }
 
         const ad = await Ad.create(data)
@@ -73,7 +82,7 @@ exports.createAd = [
 
 exports.updateAd = [
     body("link", "Link is required.").trim("").notEmpty().escape(),
-    body("company", "Company name is required.").trim("").notEmpty().escape(),
+    body("companyImg", "Company name is required.").trim("").notEmpty().escape(),
     body("product", "product name is required.").trim("").notEmpty().escape(),
     body("id", "Ad Id is required.").custom((id) => {
         return mongoose.Types.ObjectId.isValid(id);
@@ -156,3 +165,5 @@ exports.deleteAd = [
         res.status(200).json({ message: "Ad is successfully deleted", isSuccess: true })
 
     })]
+
+
