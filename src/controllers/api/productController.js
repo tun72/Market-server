@@ -249,9 +249,9 @@ exports.removeProduct = factory.deleteOne(Product)
 exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
 
     // need to make this with aggregation and random limit 7
-    const products = await Product.aggregate([
+    let products = await Product.aggregate([
         { $match: { isFeatured: true } },
-        { $sample: { size: 10 } },
+        { $sample: { size: 15 } },
         { $addFields: { id: "$_id" } },
         {
             $lookup: {
@@ -299,6 +299,10 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
     ])
 
     // console.log(products);
+
+    products = products.map((product) => {
+        return { ...product, optimize_images: product.images.map((image) => image.split(".")[0] + ".webp") }
+    })
 
     return res.status(200).json({ message: "sucess", products, isSuccess: true })
 })
