@@ -4,6 +4,7 @@ const Customer = require("../../models/customerModel");
 const AppError = require("../../utils/appError");
 const catchAsync = require("../../utils/catchAsync");
 const ImageQueue = require("../../jobs/queues/ImageQueue");
+const { removeImages } = require("../../utils/fileDelete");
 
 // Get customer profile by IDe
 exports.getCustomerProfile = catchAsync(async (req, res, next) => {
