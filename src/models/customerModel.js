@@ -8,7 +8,7 @@ const customerSchema = new mongoose.Schema({
     googleId: {
         type: String,
     },
-    shippingAddresses: {
+    shippingAddresse: {
         street: String,
         city: String,
         state: String,
@@ -18,14 +18,14 @@ const customerSchema = new mongoose.Schema({
     image: {
         type: String
     },
-    paymentMethods: [
-        {
-            cardType: String,
-            last: String,
-            expiry: String,
-            isDefault: Boolean,
-        },
-    ],
+}, {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
+
+customerSchema.virtual('optimize_images').get(function () {
+    return this?.image ? this.image.split(".")[0] + ".webp" : undefined
+});
+
 const Customer = User.discriminator("customer", customerSchema);
 module.exports = Customer

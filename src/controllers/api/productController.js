@@ -158,7 +158,7 @@ exports.getProductById = catchAsync(async (req, res, next) => {
                         }
                     },
                     { $unwind: { path: "$merchant", preserveNullAndEmptyArrays: true } },
-                    { $limit: 5 },
+                    { $limit: 4 },
                     {
                         $addFields: {
                             "merchant.address.fulladdress": {
@@ -183,11 +183,15 @@ exports.getProductById = catchAsync(async (req, res, next) => {
                         }
                     },
                     {
+                        $addFields: {
+                            "id": "$_id"
+                        }
+                    },
+                    {
                         $project: {
                             __v: 0,
                             _id: 0,
                             merchant: {
-                                _id: 0,
                                 "password": 0,
                                 "randToken": 0,
                                 "NRCNumber": 0,
@@ -198,7 +202,8 @@ exports.getProductById = catchAsync(async (req, res, next) => {
                                 "createdAt": 0,
                                 "updatedAt": 0,
                                 role: 0
-                            }
+                            },
+
                         }
                     }  // Exclude unnecessary fields
                 ],
@@ -220,7 +225,8 @@ exports.getProductById = catchAsync(async (req, res, next) => {
                     "__v": 0,
                     "createdAt": 0,
                     "updatedAt": 0,
-                    role: 0
+                    role: 0,
+
                 }
             }
         },
@@ -238,6 +244,10 @@ exports.getProductById = catchAsync(async (req, res, next) => {
     const product = products[0]
 
     product.optimize_images = product.images.map((image) => image.split(".")[0] + ".webp")
+
+    product.relatedProducts = product.relatedProducts.map((p) => {
+        return { ...p, optimize_images: p.images.map((image) => image.split(".")[0] + ".webp") }
+    })
     res.status(200).json({ message: "success", product: product })
 })
 

@@ -42,13 +42,16 @@ const setupSocket = (server) => {
         const senderSocketId = userSocketMap.get(message.sender);
         const recipientSocketId = userSocketMap.get(message.recipient);
 
-        console.log(message);
+        console.log(message, recipientSocketId);
 
 
         const createdMessage = await Message.create(message);
         const messageData = await Message.findById(createdMessage._id)
             .populate("sender")
             .populate("recipient");
+
+        console.log(messageData);
+
 
         if (recipientSocketId) {
             io.to(recipientSocketId).emit("receiveMessage", messageData);
