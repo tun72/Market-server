@@ -69,7 +69,8 @@ router.route("/ads").get(adController.getAllAds).
         { name: "companyImg", maxCount: 1 },
     ]), adController.createAd)
     .patch(upload.fields([
-        { name: "image", maxCount: 1 }
+        { name: "image", maxCount: 1 },
+        { name: "companyImg", maxCount: 1 },
     ]), adController.updateAd).delete(adController.deleteAd)
 
 router.get("/ads/:id", adController.getADsById)
@@ -78,7 +79,6 @@ router.get("/ads/:id", adController.getADsById)
 router.route("/types").get(typeController.getAllTypes).
     post(upload.fields([
         { name: "image", maxCount: 1 },
-
     ]), typeController.createType)
     .patch(upload.fields([
         { name: "image", maxCount: 1 },
