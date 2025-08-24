@@ -10,7 +10,9 @@ const ImageQueue = require("../../jobs/queues/ImageQueue");
 const { generateRandToken } = require("../../utils/generateToken");
 const { default: mongoose } = require("mongoose");
 const User = require("../../models/userModel");
-const bcrypt = require("bcryptjs")
+const bcrypt = require("bcryptjs");
+const { Withdraw, PaymentHistory } = require("../../models/paymentCategoryModel");
+const stripe = require("../../libs/stripe");
 // Seller
 exports.getAllSellers = factory.getAll({
     Model: Seller,
@@ -286,6 +288,71 @@ exports.updateSeller = [
 
     })
 ]
+
+// seller withdraw
+exports.getALLSellerWithDraw = factory.getAll({
+    Model: Withdraw,
+    fields: ["paymentCategory", "merchant"]
+})
+
+
+exports.updateWithdraw = [
+    param("id", "Withdraw Id is required.").custom((id) => {
+        return mongoose.Types.ObjectId.isValid(id);
+    }),
+    body("status", "Status is required").custom((value) => {
+        if (['pending', 'approved', 'rejected'].includes(value)) {
+            return true
+        }
+        return false
+    }, "Status is undefined"),
+    catchAsync(async (req, res, next) => {
+        const errors = validationResult(req).array({ onlyFirstError: true });
+
+
+        if (errors.length) {
+            return next(new AppError(errors[0].msg, 400));
+        }
+
+        const id = req.params.id;
+        const status = req.body.status
+
+
+        const withDraw = await Withdraw.findById(id).populate("paymentCategory")
+
+        if (!withDraw) {
+            next(new AppError("Withdraw is not found.", 404))
+        }
+
+        if (status === "approved" && withDraw.status === "approved") {
+            next(new AppError("Withdraw is already approved.", 400))
+        }
+
+        await Withdraw.findByIdAndUpdate(id, { status })
+
+        await PaymentHistory.create({
+            merchant: withDraw.merchant,
+            paymentMethod: withDraw.paymentCategory.pyMethod,
+            amount: withDraw.amount,
+            status: "withdraw"
+        })
+
+        res.status(200).json({
+            message: "Withdraw status successfully updated.",
+            isSuccess: true
+        })
+
+    })
+
+]
+exports.getAllStripePayments = catchAsync(async (req, res, next) => {
+    const payments = await stripe.paymentIntents.list({
+        limit: 20, // max 100
+    });
+
+    res.status(200).json({ payments })
+
+})
 
 // exports.updateSeller = factory.updateOne(Seller)
 // exports.deleteSeller = factory.deleteOne(Seller)
