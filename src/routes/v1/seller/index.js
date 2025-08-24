@@ -8,6 +8,8 @@ const paymentController = require("../../../controllers/seller/paymentController
 
 
 
+
+
 const upload = require("../../../middlewares/uploadFile");
 
 
@@ -32,6 +34,9 @@ router.delete("/products/images:delete", productController.deleteImage)
 
 
 router.get("/products/:id", productController.getProductById)
+
+
+// app.post('/api/bulk-upload', upload.single('file'),
 
 
 

@@ -1,7 +1,7 @@
 const multer = require("multer")
 
 const fileFilterConfig = (req, file, cb) => {
-    const mimtypes = ["image/png", "image/jpg", "image/jpeg"]
+    const mimtypes = ["image/png", "image/jpg", "image/jpeg", "text/csv"]
 
     console.log("hit");
 

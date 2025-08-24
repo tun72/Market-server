@@ -71,12 +71,6 @@ const productSchema = new Schema({
         type: ObjectId,
         ref: "Tag"
     }],
-    colors: [{
-        type: String
-    }],
-    sizes: [{
-        type: String
-    }],
     images: [{
         type: String,
         required: true,
