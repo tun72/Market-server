@@ -86,6 +86,14 @@ router.route("/types").get(typeController.getAllTypes).
 
 router.get("/types/:id", typeController.getTypesById)
 
+// payments
+router.get("/payments/stripe", sellerController.getAllStripePayments)
+router.get("/payments/withdraw", sellerController.getALLSellerWithDraw)
+router.patch("/payments/withdraw/:id", sellerController.updateWithdraw)
+
+
+
+
 
 
 

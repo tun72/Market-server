@@ -693,6 +693,9 @@ exports.checkoutSuccess = [
 
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
+        console.log(session);
+
+
         if (!session) {
             return next(new AppError("Session not found!", 400));
         }
@@ -793,7 +796,6 @@ exports.checkoutSuccess = [
 
                 } else {
                     // No reservation - need to check and deduct inventory atomically
-                    console.log("hit 2");
 
                     const inventoryOps = [];
                     // const merchantTotals = {};
@@ -849,7 +851,7 @@ exports.checkoutSuccess = [
 
                 // Update orders based on success/failure
                 const orderUpdateData = {
-                    stripeSessionId: sessionId,
+                    stripeSessionId: stripe.payment_intent,
                     payment: "stripe",
                     processedAt: new Date()
                 };
