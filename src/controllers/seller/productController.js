@@ -2,7 +2,7 @@ const AppError = require("../../utils/appError");
 const catchAsync = require("../../utils/catchAsync");
 const { body, validationResult, param } = require("express-validator");
 const { checkPhotoIfNotExistArray } = require("../../utils/check");
-const { createOneProduct, updateOneProduct } = require("../../services/productServices");
+const { createOneProduct, updateOneProduct, generateProducts } = require("../../services/productServices");
 const ImageQueue = require("../../jobs/queues/ImageQueue");
 
 
@@ -675,9 +675,34 @@ exports.deleteProduct = [
     })
 ]
 
-
 // category
 exports.getAllCategories = factory.getAll({
     Model: Category
+})
+
+exports.PreInsertedProducts = catchAsync(async (req, res, next) => {
+    const userId = req.userId;
+    const merchant = await Seller.findById(userId)
+
+    if (!merchant) {
+        return next(new AppError("You'r not merchant.", 400))
+    }
+
+    const products = await Product.find({ merchant: merchant._id }).limit(3).populate("category type tags")
+
+
+
+    if (products.length < 3) {
+        return next(new AppError("Required minimum to make AI Suggesstion", 400))
+    }
+
+    const preInsProducts = await generateProducts({ products })
+
+    return res.status(200).json({
+        "message": "success",
+        products: JSON.parse(preInsProducts),
+        isSuccess: true
+    })
+
 })
 
