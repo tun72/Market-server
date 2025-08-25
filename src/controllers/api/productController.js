@@ -5,7 +5,8 @@ const catchAsync = require("../../utils/catchAsync");
 const { Category } = require("../../models/productModel");
 const { Event } = require("../../models/eventsModel");
 const AppError = require("../../utils/appError");
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
+const Analytic = require("../../models/userAnalyticsModel");
 
 // products
 exports.getAllProducts = factory.getAll({
@@ -211,6 +212,11 @@ exports.getProductById = catchAsync(async (req, res, next) => {
             }
         },
         {
+            $addFields: {
+                "id": "$_id"
+            }
+        },
+        {
             $project: {
                 __v: 0,
                 _id: 0,
@@ -242,6 +248,17 @@ exports.getProductById = catchAsync(async (req, res, next) => {
         return next(new AppError("Product Not found with that Id", 404));
     }
     const product = products[0]
+
+    const isAlreadyExit = await Analytic.findOne({ product: productId, user: req.userId, category: product.category._id })
+
+    if (!isAlreadyExit) {
+        await Analytic.create({
+            user: req.userId,
+            product: productId,
+            status: "view",
+            category: product.category._id
+        })
+    }
 
     product.optimize_images = product.images.map((image) => image.split(".")[0] + ".webp")
 
@@ -325,16 +342,31 @@ exports.searchQueryProducts = catchAsync(async (req, res, next) => {
     }
 
     const product = await Product.aggregate([
-        { $match: { name: { $regex: '.*' + q + '.*', $options: 'i' } } },
         {
-            $group: {
-                _id: "$name",
+            $match: {
+                name: { $regex: '.*' + q + '.*', $options: 'i' }
             }
         },
         {
-            $project: { _id: 0, name: "$_id" }
+            $project: {
+                _id: 1,
+                name: 1,
+                category: 1
+            }
         }
     ])
+    if (product.length > 0) {
+        const isAlreadyExit = await Analytic.findOne({ product: product[0]._id, user: req.userId, category: product[0].category })
+        if (!isAlreadyExit) {
+            await Analytic.create({
+                user: req.userId,
+                product: product[0]._id,
+                status: "search",
+                category: product[0].category
+            })
+        }
+    }
+
 
     return res.status(200).json({ message: "Success", isSuccess: true, product })
 })
@@ -390,3 +422,4 @@ exports.getAllEvents = catchAsync(async (req, res, next) => {
     const filterEvents = events.filter((event) => event.status === "upcoming")
     return res.status(200).json({ message: "sucess", filterEvents })
 })
+

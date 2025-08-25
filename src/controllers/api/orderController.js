@@ -13,6 +13,7 @@ const mongoose = require("mongoose");
 const emailQueue = require("../../jobs/queues/EmailQueue");
 const { getEmailContent } = require("../../utils/sendMail");
 const { PaymentHistory } = require("../../models/paymentCategoryModel");
+const Analytic = require("../../models/userAnalyticsModel");
 dotenv.config()
 
 // Calculate total price including shipping and discount
@@ -64,6 +65,7 @@ exports.getOrderByCode = catchAsync(async (req, res, next) => {
             total
         };
     });
+
 
     res.status(200).json({
         status: "success",
@@ -151,6 +153,9 @@ exports.createOrder = [
                 const [quantity, productId] = id.split("_");
                 const parsedQuantity = Number(quantity);
 
+                console.log(productId);
+
+
                 if (!productId || isNaN(parsedQuantity) || parsedQuantity <= 0) {
                     throw new Error("Invalid product format");
                 }
@@ -158,6 +163,8 @@ exports.createOrder = [
                 return { id: productId.trim(), quantity: parsedQuantity };
             });
         } catch (error) {
+            console.log(error);
+
             next(new AppError("Invalid product format", 400));
         }
 
@@ -600,8 +607,6 @@ exports.cashOnDelivery = [
 
 
 
-
-
         const productIds = orders.map(order => order.productId);
 
         const products = await Product.find({
@@ -647,6 +652,8 @@ exports.cashOnDelivery = [
         await orderQueue.remove(`order:${code}`);
 
         if (orders[0].inventoryReserved) {
+            console.log(orders);
+
             const mongoSession = await mongoose.startSession();
             try {
                 await mongoSession.withTransaction(async () => {
@@ -659,7 +666,7 @@ exports.cashOnDelivery = [
                                     reservedInventory: -order.quantity
                                 }
                             },
-                            { session }
+                            { session: mongoSession }
                         );
                     }
                 });
@@ -675,6 +682,41 @@ exports.cashOnDelivery = [
             }
         }
         await Order.updateMany({ code }, { status: "processing", payment: "cod" })
+
+        if (products.length > 0) {
+
+            console.log(products);
+
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const endOfDay = new Date();
+            endOfDay.setHours(23, 59, 59, 999);
+
+            await Promise.all(
+                products.map(async (product) => {
+                    console.log(product.name);
+
+                    const isAlreadyExist = await Analytic.findOne({
+                        product: product._id,
+                        user: req.userId,
+                        category: product.category,
+                        status: "order",
+                        createdAt: { $gte: startOfDay, $lte: endOfDay }
+                    });
+
+                    if (!isAlreadyExist) {
+                        await Analytic.create({
+                            user: req.userId,
+                            product: product._id,
+                            status: "order",
+                            category: product.category
+                        });
+                    }
+                })
+            );
+        }
+
 
         res.status(200).json({ message: "Cash on delivery success. Please wait for merchant confirm.", isSuccess: true, })
 
@@ -693,7 +735,6 @@ exports.checkoutSuccess = [
 
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-        console.log(session);
 
 
         if (!session) {
@@ -706,6 +747,7 @@ exports.checkoutSuccess = [
 
         const orderCode = session.metadata.orderCode;
         const userId = session.metadata.userId;
+        const totalAmount = session.metadata.totalAmount;
 
         // Find orders
         const orders = await Order.find({
@@ -779,7 +821,7 @@ exports.checkoutSuccess = [
                             if (!merchantData?.merchantId) {
                                 merchantData.amount = 0;
                             }
-                            merchantData.amount += order.quantity * product.price;
+                            merchantData.amount += order.quantity * (product.price + product.shipping ? product.shipping : 0);
                             merchantData.merchantId = product.merchant
                             merchantData.customer = userId
                             merchantData.orderCode = orderCode
@@ -836,7 +878,7 @@ exports.checkoutSuccess = [
                             if (!merchantData?.merchantId) {
                                 merchantData.amount = 0;
                             }
-                            merchantData.amount += order.quantity * product.price;
+                            merchantData.amount += order.quantity * (product.price + product.shipping ? product.shipping : 0);
                             merchantData.merchantId = product.merchant
                             merchantData.customer = userId
                             merchantData.orderCode = orderCode
@@ -871,6 +913,62 @@ exports.checkoutSuccess = [
                     { session: mongoSession }
                 );
 
+
+                if (products.length > 0) {
+                    const startOfDay = new Date();
+                    startOfDay.setHours(0, 0, 0, 0);
+
+                    const endOfDay = new Date();
+                    endOfDay.setHours(23, 59, 59, 999);
+
+                    await Promise.all(
+                        products.map(async (product) => {
+                            console.log(product.name);
+
+                            const isAlreadyExist = await Analytic.findOne({
+                                product: product._id,
+                                user: req.userId,
+                                category: product.category,
+                                createdAt: { $gte: startOfDay, $lte: endOfDay }
+                            });
+
+                            if (!isAlreadyExist) {
+                                await Analytic.create({
+                                    user: req.userId,
+                                    product: product._id,
+                                    status: "purchase",
+                                    category: product.category
+                                });
+                            }
+                        })
+                    );
+                }
+
+                const date = new Date();
+
+                const formattedDate = date.toLocaleString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true
+                });
+
+                const data = {
+                    orderCode,
+                    totalProducts: products.length,
+                    totalAmount,
+                    date: formattedDate
+                };
+
+                const user = await User.findById(orders[0].userId).select("email")
+
+                // Send success email
+                await sendOrderConfirmationEmail(user.email, data);
+
+
+
                 // Update product status for zero inventory items (only if not refunding)
                 if (!shouldRefund) {
                     await updateZeroInventoryProducts(productIds, mongoSession);
@@ -890,6 +988,8 @@ exports.checkoutSuccess = [
                 });
             }
 
+
+
         } catch (error) {
             console.error('Checkout processing failed:', error);
             return next(new AppError("Checkout processing failed", 500));
@@ -904,8 +1004,7 @@ exports.checkoutSuccess = [
             console.error('Failed to remove order from queue:', queueError);
         }
 
-        // Send success email
-        await sendOrderConfirmationEmail(orders[0].userId, orderCode);
+
 
         res.status(200).json({
             status: "success",
@@ -1018,19 +1117,24 @@ async function processRefund(session, orderCode, refundReason) {
     }
 }
 
-async function sendOrderConfirmationEmail(userId, orderCode) {
+async function sendOrderConfirmationEmail(email, data) {
     try {
-        const email = await getEmailContent({
+
+        console.log(data);
+
+        const emailContent = await getEmailContent({
             filename: "orderSuccess.html",
-            data: { orderCode }
+            data: data
         });
+
+
 
         await emailQueue.add(
             "email-user",
             {
-                receiver: "tuntunmyint10182003@gmail.com", // Make this dynamic
+                receiver: email, // Make this dynamic
                 subject: "Ayeyar Market Order Confirmation",
-                html: email,
+                html: emailContent,
             },
             { removeOnComplete: true, removeOnFail: 1000 }
         );

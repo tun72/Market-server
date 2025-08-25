@@ -6,16 +6,20 @@ const orderController = require("../../../controllers/api/orderController");
 const adsController = require("../../../controllers/api/adsController");
 const merchantController = require("../../../controllers/api/merchantController");
 const customerController = require("../../../controllers/api/customerController");
+const recommendController = require("../../../controllers/api/recommendController");
+
 
 const authMiddleware = require("../../../middlewares/authMiddleware");
 const authorise = require("../../../middlewares/authoriseMiddleware");
 const upload = require("../../../middlewares/uploadFile");
 
+router.use(authMiddleware, authorise(true, "customer"))
 //events
 router.get("/events", productController.getAllEvents)
 
 // products
 router.get("/products/featured", productController.getFeaturedProducts)
+router.get("/products/recommend", recommendController.getRecommendedProduct)
 // router.get("/related-products/:productId", productController.getRelatedProduct)
 router.get("/products", productController.getAllProducts)
 router.get("/products/search", productController.searchQueryProducts)
@@ -35,7 +39,7 @@ router.get("/ads", adsController.getAllAds)
 
 
 // order
-router.use(authMiddleware, authorise(true, "customer"))
+
 router.post("/cart", cartController.addToCart)
 router.delete("/cart", cartController.deleteCart)
 router.get("/cart", cartController.getCart)

@@ -5,7 +5,7 @@ const productController = require("../../../controllers/seller/productController
 const orderController = require("../../../controllers/seller/orderController");
 const dashboardController = require("../../../controllers/seller/dashboardController");
 const paymentController = require("../../../controllers/seller/paymentController");
-
+const bulkController = require("../../../controllers/seller/bulkController");
 
 
 
@@ -35,6 +35,9 @@ router.delete("/products/images:delete", productController.deleteImage)
 
 router.get("/products/:id", productController.getProductById)
 
+router.post("/bulk-upload-products", upload.single('file'), bulkController.BulkUpload)
+
+router.get("/generate-products-by-ai", productController.PreInsertedProducts)
 
 // app.post('/api/bulk-upload', upload.single('file'),
 

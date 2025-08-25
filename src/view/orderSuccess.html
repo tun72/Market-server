@@ -29,7 +29,7 @@
           align="center"
           style="background-color: #2e7d32; padding: 24px; color: #ffffff"
         >
-          <h1 style="margin: 0; font-size: 24px">AyeyarMarket</h1>
+          <h1 style="margin: 0; font-size: 24px">AyeyarMart</h1>
           <p style="margin: 8px 0 0">Your Order Confirmation</p>
         </td>
       </tr>
@@ -64,25 +64,29 @@
               <td style="padding: 6px 0; font-size: 14px; color: #555">
                 Order Date
               </td>
-              <td style="padding: 6px 0; font-weight: bold">Oct 24, 2023</td>
+              <td style="padding: 6px 0; font-weight: bold">${{date}}</td>
             </tr>
             <tr>
               <td style="padding: 6px 0; font-size: 14px; color: #555">
                 Order ID
               </td>
-              <td style="padding: 6px 0; font-weight: bold">MP-7890-2023</td>
+              <td style="padding: 6px 0; font-weight: bold">${{orderCode}}</td>
             </tr>
             <tr>
               <td style="padding: 6px 0; font-size: 14px; color: #555">
                 Items
               </td>
-              <td style="padding: 6px 0; font-weight: bold">3 Products</td>
+              <td style="padding: 6px 0; font-weight: bold">
+                ${{totalProducts}} Products
+              </td>
             </tr>
             <tr>
               <td style="padding: 6px 0; font-size: 14px; color: #555">
                 Payment Method
               </td>
-              <td style="padding: 6px 0; font-weight: bold">Visa •••• 1234</td>
+              <td style="padding: 6px 0; font-weight: bold">
+                ${{paymentMethod}}
+              </td>
             </tr>
             <tr>
               <td
@@ -95,7 +99,7 @@
                   font-weight: bold;
                 "
               >
-                Total Amount: $246.00
+                Total Amount: ${{totalAmount}}
               </td>
             </tr>
           </table>
@@ -104,7 +108,7 @@
             <p style="margin: 0; font-size: 14px; color: #555">
               Estimated Delivery
             </p>
-            <p style="margin: 4px 0 0; font-weight: bold">Oct 28 - 30, 2023</p>
+            <p style="margin: 4px 0 0; font-weight: bold">${{deliveryDate}}</p>
           </div>
         </td>
       </tr>
