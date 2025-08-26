@@ -13,6 +13,12 @@ const authMiddleware = require("../../../middlewares/authMiddleware");
 const authorise = require("../../../middlewares/authoriseMiddleware");
 const upload = require("../../../middlewares/uploadFile");
 
+// types
+router.get("/popular-types", productController.getPopularTypes)
+router.get("/types", productController.getAllTypes)
+router.get("/categories", productController.getAllCategories)
+router.get("/categories/:id", productController.getCategories)
+
 router.use(authMiddleware, authorise(true, "customer"))
 //events
 router.get("/events", productController.getAllEvents)
@@ -25,11 +31,7 @@ router.get("/products", productController.getAllProducts)
 router.get("/products/search", productController.searchQueryProducts)
 router.get("/products/:id", productController.getProductById)
 
-// types
-router.get("/popular-types", productController.getPopularTypes)
-router.get("/types", productController.getAllTypes)
-router.get("/categories", productController.getAllCategories)
-router.get("/categories/:id", productController.getCategories)
+
 
 //merchants
 router.get("/merchants", merchantController.getAllMerchants)
