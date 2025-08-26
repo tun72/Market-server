@@ -109,7 +109,7 @@ function sendSSEUpdate(sessionId, data) {
     }
 }
 
-async function processCSVFile(filePath, sessionId, uploadSession, merchant, total) {
+async function processCSVFile(filePath, sessionId, uploadSession, merchant, total, res) {
     return new Promise((resolve, reject) => {
         let lineNumber = 0;
         let activeProcessing = 0; // Track active async operations
@@ -118,7 +118,7 @@ async function processCSVFile(filePath, sessionId, uploadSession, merchant, tota
         const checkCompletion = async () => {
             if (streamEnded && activeProcessing === 0) {
                 try {
-                    await handleStreamEnd(sessionId, uploadSession, lineNumber, filePath);
+                    await handleStreamEnd(sessionId, uploadSession, lineNumber, filePath, res);
                     resolve();
                 } catch (error) {
                     console.error('Error completing upload session:', error);
@@ -256,7 +256,7 @@ async function handleRecordError(error, record, lineNumber, sessionId, uploadSes
             status: 'failed',
             error: error.message
         },
-        progress: `${Math.round((uploadSession.processedRecords / total) * 100)}%`
+        progress: Math.round((uploadSession.processedRecords / total) * 100)
     });
 
     if (uploadSession.processedRecords % 10 === 0) {
@@ -265,7 +265,7 @@ async function handleRecordError(error, record, lineNumber, sessionId, uploadSes
 }
 
 // stream completion
-async function handleStreamEnd(sessionId, uploadSession, totalLines, filePath) {
+async function handleStreamEnd(sessionId, uploadSession, totalLines, filePath, res) {
     uploadSession.status = 'completed';
     uploadSession.endTime = new Date();
     uploadSession.totalRecords = totalLines;
@@ -363,7 +363,7 @@ exports.BulkUpload = catchAsync(async (req, res, next) => {
         });
 
         // Process the CSV file
-        await processCSVFile(filePath, sessionId, uploadSession, merchant, total);
+        await processCSVFile(filePath, sessionId, uploadSession, merchant, total, res);
 
     } catch (error) {
         console.error('Bulk upload error:', error);
