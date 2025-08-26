@@ -219,7 +219,7 @@ async function processCSVRecord(record, lineNumber, sessionId, uploadSession, me
                 status: result.success ? 'success' : 'failed',
                 error: result.success ? null : result.error
             },
-            progress: `${Math.round((uploadSession.processedRecords / total) * 100)}%`
+            progress: Math.round((uploadSession.processedRecords / total) * 100)
         });
         if (uploadSession.processedRecords % 10 === 0) {
             await uploadSession.save();
@@ -276,16 +276,6 @@ async function handleStreamEnd(sessionId, uploadSession, totalLines, filePath) {
     sendSSEUpdate(sessionId, {
         type: 'completed',
         sessionId,
-        summary: {
-            totalRecords: uploadSession.totalRecords,
-            successfulRecords: uploadSession.successfulRecords || 0,
-            failedRecords: uploadSession.failedRecords || 0,
-            successRate: uploadSession.totalRecords > 0
-                ? Math.round(((uploadSession.successfulRecords || 0) / uploadSession.totalRecords) * 100)
-                : 0,
-            processingTime: processingTime,
-            recentErrors: (uploadSession.errors || []).slice(-5) // Last 5 errors
-        }
     });
 
     setTimeout(() => {
@@ -295,7 +285,7 @@ async function handleStreamEnd(sessionId, uploadSession, totalLines, filePath) {
 
         setTimeout(() => {
             sseConnections.delete(sessionId);
-            // re.end
+            res.end()
         }, 2000);
     }, 1000);
 }
