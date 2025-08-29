@@ -7,6 +7,8 @@ const factory = require("../handlerFactory");
 const mongoose = require("mongoose");
 const { Product } = require("../../models/productModel");
 
+const { getSocket, userSocketMap } = require("../../socket");
+
 exports.getAllOrders = catchAsync(async (req, res, next) => {
     const userId = req.userId;
 
@@ -181,7 +183,7 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
 });
 
 exports.updateOrders = [
-    body("code", "Order code is required."),
+    body("code", "Order code is required.").notEmpty(),
     body("status", "Status is required").notEmpty().custom((value) => {
         const all_status = ["pending", "processing", "confirm", "cancel", "delivery", "success", "expired"];
         if (!all_status.includes(value)) {
@@ -197,27 +199,27 @@ exports.updateOrders = [
         }
 
         const { code, status } = req.body;
-        const userId = req.userId
+        const userId = req.userId;
 
         // Find order with additional details
-        const order = await Order.find({ merchant: userId, code }).populate('productId.product');
-        if (!order) {
-            return next(new AppError("No order found with that Id.", 404));
+        const orders = await Order.find({ merchant: userId, code }).populate('productId.product');
+        if (!orders || orders.length === 0) {
+            return next(new AppError("No order found with that code.", 404));
         }
 
+        const order = orders[0];
+        const currentStatus = order.status;
 
-
-        const currentStatus = order[0].status
         // Validate status transition
         const validTransitions = {
             'pending': ['processing', 'cancel'],
             'processing': ['confirm', 'cancel'],
             'confirm': ['delivery', 'cancel'],
             'delivery': ['success', 'cancel'],
-            // 'success': ['expired'],
-            'cancel': ["confirm"], // Terminal stat
+            'success': [], // Terminal status
+            'cancel': ['confirm'], // Allow reconfirmation of cancelled orders
+            'expired': [] // Terminal status
         };
-
 
         if (!validTransitions[currentStatus]?.includes(status)) {
             return next(new AppError(
@@ -231,54 +233,99 @@ exports.updateOrders = [
 
         try {
             await session.withTransaction(async () => {
-                // Update order status
-
+                // Handle status-specific logic first - pass the orders array instead of single order
                 switch (status) {
                     case 'confirm':
-                        await handleOrderConfirmation(order, session);
+                        await handleOrderConfirmation(orders, session);
                         break;
                     case 'cancel':
-                        await handleOrderCancellation(order, session);
+                        await handleOrderCancellation(orders, session);
                         break;
                     case 'success':
-                        await handleOrderSuccess(order, session);
+                        await handleOrderSuccess(orders, session);
                         break;
-                    // case 'delivery':
-                    //     await handleDeliveryConfirmation(order, session);
-                    // break;
-                    // case 'refunded':
-                    //     await handleRefund(order, session);
-                    // break;
+                    case 'delivery':
+                        // Uncomment and implement if needed
+                        // await handleDeliveryConfirmation(orders, session);
+                        break;
                 }
+
+                // Update order status
                 const updatedOrders = await Order.updateMany(
                     { code, merchant: userId },
                     {
                         status: status,
                         updatedAt: new Date(),
                     },
-                    { session }
+                    { session, new: true }
                 );
 
-                // Handle inventory and business logic based on status
+                if (updatedOrders.modifiedCount === 0) {
+                    throw new Error("Failed to update order status");
+                }
+
+                // Get the updated orders data for socket emission
+                const updatedOrderList = await Order.find({ code, merchant: userId })
+                    .populate({ path: "productId", select: "price shipping name images" })
+                    .lean()
+                    .session(session);
 
 
-                // Send notifications
-                // await sendStatusUpdateNotification(updatedOrder, status);
+
+
+
+                // Prepare orders with total calculation in the correct format
+                let totalAmount = 0
+                const ordersWithTotal = updatedOrderList.map(order => {
+                    let total = 0;
+                    if (order.productId && order.productId.price) {
+                        const amount = Math.round(order.productId.price * 100);
+                        const shippingFee = (order.productId.shipping * 100)
+                        total = [(amount + shippingFee) * order.quantity] / 100;
+                        totalAmount += total;
+                    }
+                    return {
+                        ...order,
+                        total
+                    };
+                });
+
+                // Emit socket event to customer with proper order details
+                const io = getSocket();
+                const customerSocketId = userSocketMap.get(updatedOrderList[0].userId.toString());
+
+                console.log(userSocketMap);
+
+
+                if (customerSocketId) {
+                    io.to(customerSocketId).emit('order-status-changed', ordersWithTotal);
+                } else {
+                    console.log(`Customer socket not found for user: ${updatedOrderList[0].userId}`);
+                }
             });
 
+            // Session will be automatically ended by withTransaction
             res.status(200).json({
-                message: "Order updated successfully.",
-                isSuccess: "true"
+                message: "Order status updated successfully.",
+                isSuccess: true,
+                data: {
+                    orderCode: code,
+                    newStatus: status,
+                    previousStatus: currentStatus
+                }
             });
-
-            session.endSession();
 
         } catch (error) {
-            await session.abortTransaction();
+            // Don't manually abort - withTransaction handles this automatically
+            // Just end the session and handle the error
             return next(new AppError(error.message || "Failed to update order", 500));
+        } finally {
+            // Ensure session is always ended
+            await session.endSession();
         }
     })
 ];
+
 
 // Helper functions for status-specific logic
 async function handleOrderConfirmation(order, session) {
