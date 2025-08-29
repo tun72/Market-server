@@ -21,7 +21,7 @@ const sendEmail = async ({ receiver, subject, html }) => {
 
 
 
-const getEmailContent = async ({ filename, data }) => {
+const getEmailContent = async ({ filename, data, type }) => {
     try {
         let template = await fs.readFile(
             path.join(__dirname, "../view", filename),
@@ -30,13 +30,21 @@ const getEmailContent = async ({ filename, data }) => {
 
 
         // Simple replacements
-        template = template
-            .replace("${{date}}", data.date)
-            .replace("${{orderCode}}", data.orderCode)
-            .replace("${{totalProducts}}", data.totalProducts)
-            .replace('${{totalAmount}}', data.totalAmount)
-            .replace("${{paymentMethod}}", data.paymentMethod || "Visa •••• 1234")
-            .replace("${{deliveryDate}}", "August 30 - Sept 2, 2025");
+        switch (type) {
+            case "customer":
+                template = template
+                    .replace("${{date}}", data.date)
+                    .replace("${{orderCode}}", data.orderCode)
+                    .replace("${{totalProducts}}", data.totalProducts)
+                    .replace('${{totalAmount}}', data.totalAmount)
+                    .replace("${{paymentMethod}}", data.paymentMethod || "Visa •••• 1234")
+                    .replace("${{deliveryDate}}", "August 30 - Sept 2, 2025");
+                break
+            case "merchant":
+
+            default:
+                break
+        }
 
 
         return template;

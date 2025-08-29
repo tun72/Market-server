@@ -14,6 +14,8 @@ const emailQueue = require("../../jobs/queues/EmailQueue");
 const { getEmailContent } = require("../../utils/sendMail");
 const { PaymentHistory } = require("../../models/paymentCategoryModel");
 const Analytic = require("../../models/userAnalyticsModel");
+const { getSocket, userSocketMap } = require("../../socket");
+const Customer = require("../../models/customerModel");
 dotenv.config()
 
 // Calculate total price including shipping and discount
@@ -586,6 +588,7 @@ exports.cashOnDelivery = [
         }
 
         const userId = req.userId
+        const user = await Customer.findById(userId)
 
         const { code } = req.body
 
@@ -611,7 +614,7 @@ exports.cashOnDelivery = [
 
         const products = await Product.find({
             _id: { $in: productIds }
-        })
+        }).select("_id merchant")
 
         if (!products || products.length === 0) {
             throw new AppError("No valid products found for this order.", 400);
@@ -652,8 +655,6 @@ exports.cashOnDelivery = [
         await orderQueue.remove(`order:${code}`);
 
         if (orders[0].inventoryReserved) {
-
-
             const mongoSession = await mongoose.startSession();
             try {
                 await mongoSession.withTransaction(async () => {
@@ -681,12 +682,9 @@ exports.cashOnDelivery = [
                 await mongoSession.endSession();
             }
         }
-        await Order.updateMany({ code }, { status: "processing", payment: "cod" })
+        await Order.updateMany({ code }, { status: "order placed", payment: "cod" })
 
         if (products.length > 0) {
-
-
-
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
 
@@ -695,8 +693,6 @@ exports.cashOnDelivery = [
 
             await Promise.all(
                 products.map(async (product) => {
-
-
                     const isAlreadyExist = await Analytic.findOne({
                         product: product._id,
                         user: req.userId,
@@ -716,6 +712,38 @@ exports.cashOnDelivery = [
                 })
             );
         }
+
+        const io = getSocket();
+        products.map((product) => {
+            const merchantId = userSocketMap.get(product.merchant)
+            io.to(merchantId).emit("push-notification", {
+                message: "You have new cash on delivery order. Please check.",
+                link: "/dashboard/orders"
+            })
+        })
+
+        // const data = {
+        //     customerName: user.name,
+        //     customerPhone: user?.phone ?? "",
+        //     totalProducts: order.quantity,
+
+
+        // }
+
+        // const emailContent = await getEmailContent({
+        //     filename: "customerCod",
+        //     data: data
+        // });
+
+        // await emailQueue.add(
+        //     "email-user",
+        //     {
+        //         receiver: email, // Make this dynamic
+        //         subject: "You have a new Order",
+        //         html: emailContent,
+        //     },
+        //     { removeOnComplete: true, removeOnFail: 1000 }
+        // );
 
 
         res.status(200).json({ message: "Cash on delivery success. Please wait for merchant confirm.", isSuccess: true, })
@@ -903,7 +931,7 @@ exports.checkoutSuccess = [
                     orderUpdateData.refundReason = refundReason.join(', ');
                 } else {
                     orderUpdateData.isPaid = true;
-                    orderUpdateData.status = "confirm";
+                    orderUpdateData.status = "confirmed";
                     orderUpdateData.paidAt = new Date();
                 }
 
