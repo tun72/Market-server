@@ -92,8 +92,6 @@ const orderQueue = new Worker('order-expiration', async (job) => {
                 },
                 { session }
             );
-
-            console.log(`Marked orders as expired: ${code}`);
         });
 
     } catch (error) {

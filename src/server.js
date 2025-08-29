@@ -21,7 +21,7 @@ app.use(express.json()).use(cookieParser());
 app.use(express.static("public"));
 app.use(express.static("uploads"));
 
-let whitelist = ["http://localhost:5173", "http://localhost:5174"]
+let whitelist = ["http://localhost:5173", "http://localhost:5174", "https://q9bwjgg7-5173.asse.devtunnels.ms"]
 const corsOptions = {
   origin: function (
     origin,
@@ -46,7 +46,13 @@ app.use(bodyParser.json());
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
+
+
 app.use(routes)
+app.get("/", (req, res) => {
+  res.redirect(process.env.FRONTEND_URL)
+})
+
 app.use(globalErrorController);
 
 

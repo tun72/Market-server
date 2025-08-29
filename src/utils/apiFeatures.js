@@ -27,8 +27,6 @@ class ApiFeature {
       // const values = queryObj[orKey].split(',');    // ['user1', 'user2']
       // delete queryObj[orKey];
 
-      // console.log(fields, values);
-
 
       if (fields.length === 2 && values.length === 2) {
         filter["$or"] = [
@@ -66,13 +64,10 @@ class ApiFeature {
 
 
 
-    console.log(filter);
-
-
     try {
       this.query = this.query.find(filter);
     } catch (e) {
-      console.log(e);
+
 
       throw new AppError("Something went wrong please check", 400)
     }

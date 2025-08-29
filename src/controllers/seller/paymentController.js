@@ -95,7 +95,7 @@ exports.createPaymentMethod = [
             active: true
         }
 
-        console.log(data);
+
 
 
         await PaymentCategory.create(data)
@@ -251,7 +251,7 @@ exports.getPaymentMethodById = [
             next(new AppError("You'r not allowed this action."), 403)
         }
 
-        console.log("hit");
+
 
 
         const isExist = await PaymentCategory.findOne({ merchant: merchant.id, _id: new mongoose.Types.ObjectId(id) })
@@ -260,7 +260,6 @@ exports.getPaymentMethodById = [
             next(new AppError("You'r not allowed this action", 403))
         }
 
-        console.log(isExist);
 
         next()
     }), factory.getOne({
@@ -301,7 +300,7 @@ exports.withDraw = [
             return next(new AppError("INVALID_PAYMENT_AMOUNT", 400));
         }
 
-        console.log(merchant);
+
 
 
         if (amount > merchant.balance) {

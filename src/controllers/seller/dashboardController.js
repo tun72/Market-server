@@ -63,7 +63,7 @@ exports.getStatus = catchAsync(async (req, res) => {
             }
         ]);
 
-        console.log(revenueStats);
+
 
 
         // 2. Total Orders Aggregation
@@ -140,13 +140,13 @@ exports.getStatus = catchAsync(async (req, res) => {
             ])
         ]);
 
-        console.log(currentMonthUsers, lastMonthUsers);
+
 
 
         // 4. Total Products Count
         const totalProducts = await Product.countDocuments({ merchant: merchantId });
 
-        console.log(totalProducts);
+
 
 
         // Calculate percentage changes
@@ -259,7 +259,7 @@ exports.getRevenueAndOrderChart = catchAsync(async (req, res, next) => {
             { $sort: { month: 1 } }
         ]);
 
-        console.log(monthlyStats.length);
+
 
         const currentMonthIndex = new Date().getMonth();
 

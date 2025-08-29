@@ -6,7 +6,7 @@ let io = null
 const userSocketMap = new Map();
 const setupSocket = (server) => {
 
-    let whitelist = ["http://localhost:5173", "http://localhost:5174"]
+    let whitelist = ["http://localhost:5173", "http://localhost:5174", "https://q9bwjgg7-5173.asse.devtunnels.ms"]
     const corsOptions = {
         origin: function (
             origin,
@@ -42,15 +42,12 @@ const setupSocket = (server) => {
         const senderSocketId = userSocketMap.get(message.sender);
         const recipientSocketId = userSocketMap.get(message.recipient);
 
-        console.log(message, recipientSocketId);
-
 
         const createdMessage = await Message.create(message);
         const messageData = await Message.findById(createdMessage._id)
             .populate("sender")
             .populate("recipient");
 
-        console.log(messageData);
 
 
         if (recipientSocketId) {
@@ -65,7 +62,7 @@ const setupSocket = (server) => {
 
     io.on("connection", (socket) => {
         const userId = socket.handshake.query.userId;
-        console.log(userId);
+
 
         if (userId) {
             userSocketMap.set(userId, socket.id);

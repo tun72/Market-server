@@ -325,7 +325,6 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
         }
     ])
 
-    // console.log(products);
 
     products = products.map((product) => {
         return { ...product, optimize_images: product.images.map((image) => image.split(".")[0] + ".webp") }

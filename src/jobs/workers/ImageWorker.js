@@ -26,7 +26,5 @@ imageWorker.on("completed", (job) => {
 });
 
 imageWorker.on("failed", (job, err) => {
-    console.log(err);
-
     console.log(`Job failed with result ${job.id} and error - ${err}`);
 });

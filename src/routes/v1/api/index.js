@@ -13,6 +13,8 @@ const authMiddleware = require("../../../middlewares/authMiddleware");
 const authorise = require("../../../middlewares/authoriseMiddleware");
 const upload = require("../../../middlewares/uploadFile");
 
+
+
 // types
 router.get("/popular-types", productController.getPopularTypes)
 router.get("/types", productController.getAllTypes)

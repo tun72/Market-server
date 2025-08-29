@@ -153,7 +153,7 @@ exports.createOrder = [
                 const [quantity, productId] = id.split("_");
                 const parsedQuantity = Number(quantity);
 
-                console.log(productId);
+
 
 
                 if (!productId || isNaN(parsedQuantity) || parsedQuantity <= 0) {
@@ -163,7 +163,7 @@ exports.createOrder = [
                 return { id: productId.trim(), quantity: parsedQuantity };
             });
         } catch (error) {
-            console.log(error);
+
 
             next(new AppError("Invalid product format", 400));
         }
@@ -652,7 +652,7 @@ exports.cashOnDelivery = [
         await orderQueue.remove(`order:${code}`);
 
         if (orders[0].inventoryReserved) {
-            console.log(orders);
+
 
             const mongoSession = await mongoose.startSession();
             try {
@@ -685,7 +685,7 @@ exports.cashOnDelivery = [
 
         if (products.length > 0) {
 
-            console.log(products);
+
 
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
@@ -695,7 +695,7 @@ exports.cashOnDelivery = [
 
             await Promise.all(
                 products.map(async (product) => {
-                    console.log(product.name);
+
 
                     const isAlreadyExist = await Analytic.findOne({
                         product: product._id,
@@ -821,7 +821,7 @@ exports.checkoutSuccess = [
                             if (!merchantData?.merchantId) {
                                 merchantData.amount = 0;
                             }
-                            merchantData.amount += order.quantity * (product.price + product.shipping ? product.shipping : 0);
+                            merchantData.amount += totalAmount;
                             merchantData.merchantId = product.merchant
                             merchantData.customer = userId
                             merchantData.orderCode = orderCode
@@ -878,7 +878,7 @@ exports.checkoutSuccess = [
                             if (!merchantData?.merchantId) {
                                 merchantData.amount = 0;
                             }
-                            merchantData.amount += order.quantity * (product.price + product.shipping ? product.shipping : 0);
+                            merchantData.amount += totalAmount;
                             merchantData.merchantId = product.merchant
                             merchantData.customer = userId
                             merchantData.orderCode = orderCode
@@ -923,7 +923,7 @@ exports.checkoutSuccess = [
 
                     await Promise.all(
                         products.map(async (product) => {
-                            console.log(product.name);
+
 
                             const isAlreadyExist = await Analytic.findOne({
                                 product: product._id,
@@ -1036,7 +1036,6 @@ async function updateMerchantBalances(merchantData, mongoSession) {
 
     await Seller.bulkWrite(merchantOps, { session: mongoSession });
 
-    // console.log(merchantTotals);
 
 
     const paymentHistoryOps = [
@@ -1099,7 +1098,6 @@ async function processRefund(session, orderCode, refundReason) {
             }
         );
 
-        console.log(`Order ${orderCode} refunded: ${refundReason.join(', ')}`);
 
     } catch (refundError) {
         console.error('Refund processing failed:', refundError);
@@ -1120,7 +1118,6 @@ async function processRefund(session, orderCode, refundReason) {
 async function sendOrderConfirmationEmail(email, data) {
     try {
 
-        console.log(data);
 
         const emailContent = await getEmailContent({
             filename: "orderSuccess.html",

@@ -4,10 +4,6 @@ const fs = require("node:fs/promises")
 const path = require("path")
 dotenv.config()
 const sendEmail = async ({ receiver, subject, html }) => {
-
-
-    console.log("send mail");
-
     const transporter = await nodemailer.createTransport({
         service: "gmail",
         auth: {
@@ -15,28 +11,12 @@ const sendEmail = async ({ receiver, subject, html }) => {
             pass: process.env.SENDER_PASSWORD,
         },
     });
-
-
-
-    // const transporter = nodemailer.createTransport({
-    //     host: 'sandbox.smtp.mailtrap.io',
-    //     port: 2525,
-    //     secure: false, // use SSL
-    //     auth: {
-    //         user: process.env.SENDER_EMAIL,
-    //         pass: process.env.SENDER_PASSWORD,
-    //     }
-    // });
-    const info = await transporter.sendMail({
+    await transporter.sendMail({
         from: process.env.SENDER_EMAIL,
         to: receiver,
         subject: subject,
         html: html,
     });
-
-
-
-    console.log("Message is send to ", info.messageId);
 };
 
 
@@ -47,8 +27,6 @@ const getEmailContent = async ({ filename, data }) => {
             path.join(__dirname, "../view", filename),
             "utf-8"
         );
-
-        console.log(data);
 
 
         // Simple replacements
