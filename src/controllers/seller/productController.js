@@ -611,7 +611,7 @@ exports.updateProduct = [
             // Legacy behavior - replace all images if files are provided
             if (req.files && req.files.length > 0) {
                 const originalFiles = product.images
-                console.log(originalFiles);
+
 
                 const optimizeFiles = originalFiles.map((file) => file.split(".")[0] + ".webp")
                 await removeImages(originalFiles, optimizeFiles);

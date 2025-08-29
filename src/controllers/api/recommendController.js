@@ -68,7 +68,8 @@ exports.getRecommendedProduct = catchAsync(async (req, res, next) => {
                 merchant: product.merchant,
                 recommendationScore: product.recommendationScore,
                 createdAt: product.createdAt,
-                updatedAt: product.updatedAt
+                updatedAt: product.updatedAt,
+                optimize_images: product.images.map((image) => image.split(".")[0] + ".webp")
             })),
         };
 

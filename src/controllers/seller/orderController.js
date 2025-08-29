@@ -205,7 +205,7 @@ exports.updateOrders = [
             return next(new AppError("No order found with that Id.", 404));
         }
 
-        console.log(order);
+
 
         const currentStatus = order[0].status
         // Validate status transition

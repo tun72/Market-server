@@ -1,3 +1,0 @@
-exports.fetchUserActivity = async () => {
-    
-}

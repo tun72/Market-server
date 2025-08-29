@@ -8,7 +8,7 @@ const uploadSessionSchema = new mongoose.Schema({
     successfulRecords: { type: Number, default: 0 },
     failedRecords: { type: Number, default: 0 },
     status: { type: String, enum: ['processing', 'completed', 'error'], default: 'processing' },
-    errors: [{
+    bulkUploadErrors: [{
         line: Number,
         record: Object,
         error: String

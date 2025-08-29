@@ -23,7 +23,6 @@ exports.getAllMessages = factory.getAll({ Model: Message })
 exports.getAdminId = catchAsync(async (req, res, next) => {
     const admin = await Admin.findOne({ email: "admin@gmail.com" }).select("_id")
 
-    console.log(admin);
 
 
     res.status(200).json({
@@ -38,7 +37,6 @@ exports.getAdminId = catchAsync(async (req, res, next) => {
 
 exports.getContactForDMList = catchAsync(async (req, res, next) => {
     const userId = req.userId;
-    console.log(userId);
 
     const admin = await Admin.findById(userId)
 

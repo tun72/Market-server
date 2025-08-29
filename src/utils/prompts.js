@@ -41,6 +41,8 @@ You are an assistant that prepares product entries for merchants.
 Look at the previously added products and automatically suggest a new product entry with reasonable values filled in.  
 The suggestion should follow similar style, language (Myanmar Unicode or English), and categories.  
 
+
+
 ### Input:  
 Previous Products:
 ${previousProducts
@@ -68,7 +70,7 @@ ${i + 1}.
 
 ### Rules:
 - Fill in all fields with realistic values.
-- Suggestions must be valid, common products in Myanmar.
+- Suggestions must be valid, common products in Myanmar, only Ayeyarwaddy region products.
 - Tags and category must be names, not IDs.
 - Keep consistency with the style of previous products.
 - Output valid JSON only (no extra text, no markdown).

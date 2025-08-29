@@ -80,7 +80,7 @@ const authMiddleware = catchAsync(async (req, res, next) => {
             next()
 
         } catch (error) {
-            console.log(error);
+
 
             if (error.name === "TokenExpiredError") {
                 // open when frontend is on server

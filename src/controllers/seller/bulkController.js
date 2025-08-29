@@ -200,8 +200,8 @@ async function processCSVRecord(record, lineNumber, sessionId, uploadSession, me
                 record,
                 error: result.error
             };
-            uploadSession.errors = uploadSession.errors || [];
-            uploadSession.errors.push(errorRecord);
+            uploadSession.bulkUploadErrors = uploadSession.bulkUploadErrors || [];
+            uploadSession.bulkUploadErrors.push(errorRecord);
             uploadSession.failedRecords = (uploadSession.failedRecords || 0) + 1;
         }
 
@@ -238,8 +238,8 @@ async function handleRecordError(error, record, lineNumber, sessionId, uploadSes
         error: error.message
     };
 
-    uploadSession.errors = uploadSession.errors || [];
-    uploadSession.errors.push(errorRecord);
+    uploadSession.bulkUploadErrors = uploadSession.bulkUploadErrors || [];
+    uploadSession.bulkUploadErrors.push(errorRecord);
     uploadSession.failedRecords = (uploadSession.failedRecords || 0) + 1;
     uploadSession.processedRecords = (uploadSession.processedRecords || 0) + 1;
     uploadSession.totalRecords = lineNumber;
