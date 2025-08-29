@@ -185,7 +185,7 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
 exports.updateOrders = [
     body("code", "Order code is required.").notEmpty(),
     body("status", "Status is required").notEmpty().custom((value) => {
-        const all_status = ["pending", "processing", "confirm", "cancel", "delivery", "success", "expired"];
+        const all_status = ["pending", "order placed", "confirmed", "cancel", "processing", "shipped", "delivered", "expired"];
         if (!all_status.includes(value)) {
             throw new Error("Invalid status. Allowed: " + all_status.join(", "));
         }
@@ -212,11 +212,12 @@ exports.updateOrders = [
 
         // Validate status transition
         const validTransitions = {
-            'pending': ['processing', 'cancel'],
-            'processing': ['confirm', 'cancel'],
-            'confirm': ['delivery', 'cancel'],
-            'delivery': ['success', 'cancel'],
-            'success': [], // Terminal status
+            'pending': ['order confirmed', 'cancel'],
+            'order placed': ['confirmed', 'cancel'],
+            'confirmed': ['processing', 'cancel'],
+            "processing": ["shipped", "cancel"],
+            'shipped': ['delivered', 'cancel'],
+            'delivered': [], // Terminal status
             'cancel': ['confirm'], // Allow reconfirmation of cancelled orders
             'expired': [] // Terminal status
         };
@@ -244,7 +245,7 @@ exports.updateOrders = [
                     case 'success':
                         await handleOrderSuccess(orders, session);
                         break;
-                    case 'delivery':
+                    case 'delivering':
                         // Uncomment and implement if needed
                         // await handleDeliveryConfirmation(orders, session);
                         break;
@@ -294,7 +295,7 @@ exports.updateOrders = [
                 const io = getSocket();
                 const customerSocketId = userSocketMap.get(updatedOrderList[0].userId.toString());
 
-                console.log(userSocketMap);
+
 
 
                 if (customerSocketId) {
@@ -353,8 +354,8 @@ async function handleOrderCancellation(order, session) {
             throw new Error("Invalid productId in order.");
         }
 
-        // If the order status is "confirm", increase the inventory
-        if (item.status === "confirm") {
+        // If the order status is "confirmed", increase the inventory
+        if (item.status === "confirmed") {
             await Product.findByIdAndUpdate(
                 productId,
                 { $inc: { inventory: item.quantity } },
@@ -365,12 +366,13 @@ async function handleOrderCancellation(order, session) {
 }
 
 async function handleOrderSuccess(order, session) {
+    // email the user
     // Release reserved inventory
-    await Product.findByIdAndUpdate(
-        order.productId,
-        { $inc: { soldCount: order.quantity } },
-        { session }
-    );
+    // await Product.findByIdAndUpdate(
+    //     order.productId,
+    //     { $inc: { soldCount: order.quantity } },
+    //     { session }
+    // );
 }
 
 // async function handleDeliveryConfirmation(order, session) {

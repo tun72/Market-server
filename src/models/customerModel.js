@@ -18,6 +18,9 @@ const customerSchema = new mongoose.Schema({
     image: {
         type: String
     },
+    phone: {
+        type: Number
+    }
 }, {
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
