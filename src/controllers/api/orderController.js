@@ -614,7 +614,7 @@ exports.cashOnDelivery = [
 
         const products = await Product.find({
             _id: { $in: productIds }
-        }).select("_id merchant")
+        }).select("_id merchant inventory name")
 
         if (!products || products.length === 0) {
             throw new AppError("No valid products found for this order.", 400);
