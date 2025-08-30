@@ -34,12 +34,15 @@ exports.updateCustomerProfile = [
     param("id", "Valid customer ID is required").isMongoId(),
     body("name", "Name must be at least 2 characters long").optional().trim().isLength({ min: 2 }).escape(),
     body("email", "Please provide a valid email").optional().isEmail().normalizeEmail(),
-    body("phone", "Phone number is invalid").optional().isMobilePhone(),
+    body("phone", "Phone number is invalid").optional().matches(/^[0-9]+$/)
+        .isLength({ min: 5, max: 12 })
+        .withMessage("Phone number invalid."),
     body("street", "Street address is invalid").optional().trim().escape(),
     body("city", "City name is invalid").optional().trim().escape(),
     body("state", "State name is invalid").optional().trim().escape(),
     body("country", "Country name is invalid").optional().trim().escape(),
     body("postalCode", "Postal code is invalid").optional().trim().escape(),
+
 
     catchAsync(async (req, res, next) => {
         const errors = validationResult(req).array({ onlyFirstError: true });
@@ -86,7 +89,7 @@ exports.updateCustomerProfile = [
         // Handle basic profile fields
         if (name !== undefined) updateData.name = name;
         if (email !== undefined) updateData.email = email;
-        if (phone !== undefined) updateData.phone = phone;
+        if (phone !== undefined) updateData.phone = Number(phone);
 
         // Handle address fields
         const addressFields = { street, city, state, country, postalCode };

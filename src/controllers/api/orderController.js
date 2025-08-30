@@ -816,8 +816,6 @@ exports.checkoutSuccess = [
 
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-
-
         if (!session) {
             return next(new AppError("Session not found!", 400));
         }
@@ -828,13 +826,13 @@ exports.checkoutSuccess = [
 
         const orderCode = session.metadata.orderCode;
         const userId = session.metadata.userId;
-        const totalAmount = session.metadata.totalAmount;
+        const totalAmount = +session.metadata.totalAmount;
 
         // Find orders
         const orders = await Order.find({
             code: orderCode,
             userId: userId
-        });
+        }).populate("merchant")
 
         if (!orders || orders.length === 0) {
             return next(new AppError("Invalid order code", 400));
@@ -874,11 +872,12 @@ exports.checkoutSuccess = [
                 // Check if inventory was already reserved during checkout
                 const hasReservedInventory = orders[0].inventoryReserved;
 
+                // Track merchant earnings per merchant
+                const merchantTotals = {};
+
                 if (hasReservedInventory) {
                     // Inventory was reserved - just convert to sold
                     const inventoryOps = [];
-                    // const merchantTotals = {};
-                    const merchantData = {}
 
                     for (const order of orders) {
                         const product = productMap[order.productId.toString()];
@@ -897,15 +896,21 @@ exports.checkoutSuccess = [
                             }
                         });
 
-                        // Calculate merchant earnings
+                        const amount = Math.round(product.price * 100);
+                        const shippingFee = product.shipping * 100;
+                        const total = ((amount + shippingFee) * order.quantity) / 100;
+
+                        // Calculate merchant earnings per merchant
                         if (product.merchant) {
-                            if (!merchantData?.merchantId) {
-                                merchantData.amount = 0;
+                            if (!merchantTotals[product.merchant]) {
+                                merchantTotals[product.merchant] = {
+                                    amount: 0,
+                                    merchantId: product.merchant,
+                                    customer: userId,
+                                    orderCode: orderCode
+                                };
                             }
-                            merchantData.amount += totalAmount;
-                            merchantData.merchantId = product.merchant
-                            merchantData.customer = userId
-                            merchantData.orderCode = orderCode
+                            merchantTotals[product.merchant].amount += total;
                         }
                     }
 
@@ -914,15 +919,12 @@ exports.checkoutSuccess = [
                         await Product.bulkWrite(inventoryOps, { session: mongoSession });
                     }
 
-                    // Update merchant balances
-                    await updateMerchantBalances(merchantData, mongoSession);
+                    // Update merchant balances for each merchant
+                    await updateMerchantBalances(merchantTotals, mongoSession);
 
                 } else {
                     // No reservation - need to check and deduct inventory atomically
-
                     const inventoryOps = [];
-                    // const merchantTotals = {};
-                    const merchantData = {}
 
                     for (const order of orders) {
                         const product = productMap[order.productId.toString()];
@@ -954,21 +956,27 @@ exports.checkoutSuccess = [
                             continue;
                         }
 
-                        // Calculate merchant earnings for successful orders
+                        const amount = Math.round(product.price * 100);
+                        const shippingFee = product.shipping * 100;
+                        const total = ((amount + shippingFee) * order.quantity) / 100;
+
+                        // Calculate merchant earnings for successful orders per merchant
                         if (product.merchant) {
-                            if (!merchantData?.merchantId) {
-                                merchantData.amount = 0;
+                            if (!merchantTotals[product.merchant]) {
+                                merchantTotals[product.merchant] = {
+                                    amount: 0,
+                                    merchantId: product.merchant,
+                                    customer: userId,
+                                    orderCode: orderCode
+                                };
                             }
-                            merchantData.amount += totalAmount;
-                            merchantData.merchantId = product.merchant
-                            merchantData.customer = userId
-                            merchantData.orderCode = orderCode
+                            merchantTotals[product.merchant].amount += total;
                         }
                     }
 
                     // Update merchant balances only for successful orders
                     if (!shouldRefund) {
-                        await updateMerchantBalances(merchantData, mongoSession);
+                        await updateMerchantBalances(merchantTotals, mongoSession);
                     }
                 }
 
@@ -994,7 +1002,6 @@ exports.checkoutSuccess = [
                     { session: mongoSession }
                 );
 
-
                 if (products.length > 0) {
                     const startOfDay = new Date();
                     startOfDay.setHours(0, 0, 0, 0);
@@ -1004,8 +1011,6 @@ exports.checkoutSuccess = [
 
                     await Promise.all(
                         products.map(async (product) => {
-
-
                             const isAlreadyExist = await Analytic.findOne({
                                 product: product._id,
                                 user: req.userId,
@@ -1043,12 +1048,84 @@ exports.checkoutSuccess = [
                     date: formattedDate
                 };
 
-                const user = await User.findById(orders[0].userId).select("email")
+                const user = await User.findById(orders[0].userId)
 
                 // Send success email
                 await sendOrderConfirmationEmail(user.email, data);
+                const io = getSocket()
 
+                await Promise.all(
+                    orders.map(async (order) => {
+                        try {
+                            const product = productMap[order.productId.toString()];
 
+                            // Early return if product not found
+                            if (!product) {
+                                console.warn(`Product not found for order ${order.code}`);
+                                return;
+                            }
+
+                            const merchantId = userSocketMap.get(product.merchant);
+
+                            // Only emit if merchant is connected
+                            if (merchantId) {
+                                io.to(merchantId).emit("push-notification", {
+                                    message: "New Paid Order Received.",
+                                    link: "/dashboard/orders"
+                                });
+                            }
+
+                            // Optimize calculations - avoid unnecessary operations
+                            const amount = Math.round(product.price * 100);
+                            const shippingFee = product.shipping * 100;
+                            const total = ((amount + shippingFee) * order.quantity) / 100;
+
+                            // Pre-compute address string to avoid repeated concatenation
+                            const deliveryAddress = `${user.shippingAddresse.street}, ${user.shippingAddresse.city}, ${user.shippingAddresse.state}`;
+
+                            const data = {
+                                merchantName: order.merchant.name,
+                                date: formattedDate,
+                                code: order.code,
+                                customerName: user.name,
+                                customerPhone: user?.phone ?? "",
+                                totalProducts: order.quantity,
+                                totalAmount: total,
+                                deliveryAddress: deliveryAddress,
+                                merchantEarnings: total
+                            };
+
+                            // Parallel execution of email content generation and queue addition
+                            const emailContent = await getCodContent({
+                                filename: "stripeOrder.html",
+                                data: data
+                            });
+
+                            // Add to email queue with optimized options
+                            await emailQueue.add(
+                                "email-user",
+                                {
+                                    receiver: order.merchant.email,
+                                    subject: "You have a new Order",
+                                    html: emailContent,
+                                },
+                                {
+                                    removeOnComplete: 5, // Reduced from default
+                                    removeOnFail: 100,   // Reduced from 1000
+                                    attempts: 3,         // Add retry attempts
+                                    backoff: {
+                                        type: 'exponential',
+                                        delay: 2000
+                                    }
+                                }
+                            );
+
+                        } catch (error) {
+                            console.error(`Error processing order ${order.code}:`, error);
+                            // Consider adding error tracking/monitoring here
+                        }
+                    })
+                );
 
                 // Update product status for zero inventory items (only if not refunding)
                 if (!shouldRefund) {
@@ -1069,8 +1146,6 @@ exports.checkoutSuccess = [
                 });
             }
 
-
-
         } catch (error) {
             console.error('Checkout processing failed:', error);
             return next(new AppError("Checkout processing failed", 500));
@@ -1085,8 +1160,6 @@ exports.checkoutSuccess = [
             console.error('Failed to remove order from queue:', queueError);
         }
 
-
-
         res.status(200).json({
             status: "success",
             isSuccess: true,
@@ -1096,46 +1169,34 @@ exports.checkoutSuccess = [
     }),
 ];
 
-async function updateMerchantBalances(merchantData, mongoSession) {
-    if (Object.keys(merchantData).length === 0) return;
+async function updateMerchantBalances(merchantTotals, mongoSession) {
+    if (Object.keys(merchantTotals).length === 0) return;
 
-    // const merchantOps = Object.entries(merchantTotals).map(([merchantId, amount]) => ({
-    //     updateOne: {
-    //         filter: { _id: merchantId },
-    //         update: { $inc: { balance: amount } }
-    //     }
-    // }));
-
-    const merchantOps = [
-        {
-            updateOne: {
-                filter: { _id: merchantData.merchantId },
-                update: { $inc: { balance: merchantData.amount } }
-            }
+    // Create bulk operations for updating merchant balances
+    const merchantOps = Object.entries(merchantTotals).map(([merchantId, merchantData]) => ({
+        updateOne: {
+            filter: { _id: merchantId },
+            update: { $inc: { balance: merchantData.amount } }
         }
-    ];
+    }));
 
     await Seller.bulkWrite(merchantOps, { session: mongoSession });
 
-
-
-    const paymentHistoryOps = [
-        {
-            insertOne: {
-                document: {
-                    customer: merchantData.customer,
-                    paymentMethod: "stripe",
-                    amount: merchantData.amount,
-                    orderCode: merchantData.orderCode,
-                    merchant: merchantData.merchantId,
-                    status: "income"
-                }
+    // Create payment history entries for each merchant
+    const paymentHistoryOps = Object.entries(merchantTotals).map(([merchantId, merchantData]) => ({
+        insertOne: {
+            document: {
+                customer: merchantData.customer,
+                paymentMethod: "stripe",
+                amount: merchantData.amount,
+                orderCode: merchantData.orderCode,
+                merchant: merchantId,
+                status: "income"
             }
         }
-    ];
+    }));
 
     await PaymentHistory.bulkWrite(paymentHistoryOps, { session: mongoSession });
-
 }
 
 async function updateZeroInventoryProducts(productIds, mongoSession) {
@@ -1179,7 +1240,6 @@ async function processRefund(session, orderCode, refundReason) {
             }
         );
 
-
     } catch (refundError) {
         console.error('Refund processing failed:', refundError);
 
@@ -1198,14 +1258,10 @@ async function processRefund(session, orderCode, refundReason) {
 
 async function sendOrderConfirmationEmail(email, data) {
     try {
-
-
         const emailContent = await getEmailContent({
             filename: "orderSuccess.html",
             data: data
         });
-
-
 
         await emailQueue.add(
             "email-user",

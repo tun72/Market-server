@@ -139,7 +139,13 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
                 user: {
                     name: 1,
                     email: 1,
-                    shippingAddresses: 1
+                    address: {
+                        street: "$user.shippingAddresse.street",
+                        city: "$user.shippingAddresse.city",
+                        state: "$user.shippingAddresse.state",
+                        zipCode: "$user.shippingAddresse.zipCode",
+                        country: "$user.shippingAddresse.country"
+                    }
                 },
                 totalProducts: 1,
                 totalAmount: 1,
@@ -168,7 +174,6 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
     ]);
 
     const totalOrders = totalCountResult[0]?.total || 0;
-
 
     res.status(200).json({
         isSuccess: true,
@@ -236,18 +241,14 @@ exports.updateOrders = [
             await session.withTransaction(async () => {
                 // Handle status-specific logic first - pass the orders array instead of single order
                 switch (status) {
-                    case 'confirm':
+                    case 'confirmed':
                         await handleOrderConfirmation(orders, session);
                         break;
                     case 'cancel':
                         await handleOrderCancellation(orders, session);
                         break;
-                    case 'success':
+                    case 'delivered':
                         await handleOrderSuccess(orders, session);
-                        break;
-                    case 'delivering':
-                        // Uncomment and implement if needed
-                        // await handleDeliveryConfirmation(orders, session);
                         break;
                 }
 

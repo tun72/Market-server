@@ -105,7 +105,7 @@ exports.signUp = [
             }
             return next(new AppError(errors[0].msg, 400));
         }
-        const { email, password, passwordConfirm, name, state, city, country, street, postalCode } = req.body;
+        const { email, password, passwordConfirm, name, state, city, country, street, postalCode, phone } = req.body;
 
         const isUserExit = await User.findOne({ email })
 
@@ -117,7 +117,7 @@ exports.signUp = [
             return next(new AppError("Password are not match", 400))
         }
 
-        const newUser = await Customer.create({ name, password, passwordConfirm, email, randToken: generateRandToken(), shippingAddresse: { state, city, street, country, postalCode } });
+        const newUser = await Customer.create({ name, password, passwordConfirm, email, randToken: generateRandToken(), shippingAddresse: { state, city, street, country, postalCode }, phone: Number(phone) });
 
         createSendToken({ user: newUser, res, statusCode: 201, next });
     })]
