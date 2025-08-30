@@ -236,18 +236,14 @@ exports.updateOrders = [
             await session.withTransaction(async () => {
                 // Handle status-specific logic first - pass the orders array instead of single order
                 switch (status) {
-                    case 'confirm':
+                    case 'confirmed':
                         await handleOrderConfirmation(orders, session);
                         break;
                     case 'cancel':
                         await handleOrderCancellation(orders, session);
                         break;
-                    case 'success':
+                    case 'delivered':
                         await handleOrderSuccess(orders, session);
-                        break;
-                    case 'delivering':
-                        // Uncomment and implement if needed
-                        // await handleDeliveryConfirmation(orders, session);
                         break;
                 }
 

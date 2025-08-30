@@ -73,7 +73,9 @@ const getCodContent = async ({ filename, data }) => {
             .replace("${{customerPhone}}", data?.customerPhone ?? "")
             .replace("${{totalProducts}}", data.totalProducts)
             .replace('${{totalAmount}}', data.totalAmount)
-            .replace("${{deliveryAddress}}", data.deliveryAddress);
+            .replace("${{deliveryAddress}}", data.deliveryAddress)
+            .replace("${{merchantEarnings}}", data.merchantEarnings)
+            .replace("${{merchantName}}", data.merchantName)
 
         return template;
     } catch (error) {
