@@ -11,7 +11,7 @@ const Seller = require("../../models/sellerModel");
 const orderQueue = require("../../jobs/queues/OrderQueue");
 const mongoose = require("mongoose");
 const emailQueue = require("../../jobs/queues/EmailQueue");
-const { getEmailContent } = require("../../utils/sendMail");
+const { getEmailContent, getCodContent } = require("../../utils/sendMail");
 const { PaymentHistory } = require("../../models/paymentCategoryModel");
 const Analytic = require("../../models/userAnalyticsModel");
 const { getSocket, userSocketMap } = require("../../socket");
@@ -590,6 +590,9 @@ exports.cashOnDelivery = [
         const userId = req.userId
         const user = await Customer.findById(userId)
 
+        console.log(user);
+
+
         const { code } = req.body
 
         const orders = await Order.find({
@@ -597,7 +600,7 @@ exports.cashOnDelivery = [
             status: "pending",
             userId: userId,
             isPaid: false,
-        })
+        }).populate("merchant")
 
         if (!orders || orders.length === 0) {
             throw new AppError("Invalid order code or no pending orders found.", 400);
@@ -614,7 +617,7 @@ exports.cashOnDelivery = [
 
         const products = await Product.find({
             _id: { $in: productIds }
-        }).select("_id merchant inventory name category")
+        }).select("_id merchant inventory name category price shipping")
 
         if (!products || products.length === 0) {
             throw new AppError("No valid products found for this order.", 400);
@@ -714,36 +717,86 @@ exports.cashOnDelivery = [
         }
 
         const io = getSocket();
-        products.map((product) => {
-            const merchantId = userSocketMap.get(product.merchant)
-            io.to(merchantId).emit("push-notification", {
-                message: "You have new cash on delivery order. Please check.",
-                link: "/dashboard/orders"
+        const date = new Date();
+        const formattedDate = date.toLocaleString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true
+        });
+
+        await Promise.all(
+            orders.map(async (order) => {
+                try {
+                    const product = productMap[order.productId.toString()];
+
+                    // Early return if product not found
+                    if (!product) {
+                        console.warn(`Product not found for order ${order.code}`);
+                        return;
+                    }
+
+                    const merchantId = userSocketMap.get(product.merchant);
+
+                    // Only emit if merchant is connected
+                    if (merchantId) {
+                        io.to(merchantId).emit("push-notification", {
+                            message: "You have new cash on delivery order. Please check.",
+                            link: "/dashboard/orders"
+                        });
+                    }
+
+                    // Optimize calculations - avoid unnecessary operations
+                    const amount = Math.round(product.price * 100);
+                    const shippingFee = product.shipping * 100;
+                    const total = ((amount + shippingFee) * order.quantity) / 100;
+
+                    // Pre-compute address string to avoid repeated concatenation
+                    const deliveryAddress = `${user.shippingAddresse.street}, ${user.shippingAddresse.city}, ${user.shippingAddresse.state}`;
+
+                    const data = {
+                        date: formattedDate,
+                        code: order.code,
+                        customerName: user.name,
+                        customerPhone: user?.phone ?? "",
+                        totalProducts: order.quantity,
+                        totalAmount: total,
+                        deliveryAddress: deliveryAddress
+                    };
+
+                    // Parallel execution of email content generation and queue addition
+                    const emailContent = await getCodContent({
+                        filename: "customerCod.html",
+                        data: data
+                    });
+
+                    // Add to email queue with optimized options
+                    await emailQueue.add(
+                        "email-user",
+                        {
+                            receiver: order.merchant.email,
+                            subject: "You have a new Order",
+                            html: emailContent,
+                        },
+                        {
+                            removeOnComplete: 5, // Reduced from default
+                            removeOnFail: 100,   // Reduced from 1000
+                            attempts: 3,         // Add retry attempts
+                            backoff: {
+                                type: 'exponential',
+                                delay: 2000
+                            }
+                        }
+                    );
+
+                } catch (error) {
+                    console.error(`Error processing order ${order.code}:`, error);
+                    // Consider adding error tracking/monitoring here
+                }
             })
-        })
-
-        // const data = {
-        //     customerName: user.name,
-        //     customerPhone: user?.phone ?? "",
-        //     totalProducts: order.quantity,
-
-
-        // }
-
-        // const emailContent = await getEmailContent({
-        //     filename: "customerCod",
-        //     data: data
-        // });
-
-        // await emailQueue.add(
-        //     "email-user",
-        //     {
-        //         receiver: email, // Make this dynamic
-        //         subject: "You have a new Order",
-        //         html: emailContent,
-        //     },
-        //     { removeOnComplete: true, removeOnFail: 1000 }
-        // );
+        );
 
 
         res.status(200).json({ message: "Cash on delivery success. Please wait for merchant confirm.", isSuccess: true, })
