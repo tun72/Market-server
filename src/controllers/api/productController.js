@@ -277,7 +277,7 @@ exports.getFeaturedProducts = catchAsync(async (req, res, next) => {
 
     // need to make this with aggregation and random limit 7
     let products = await Product.aggregate([
-        { $match: { isFeatured: true } },
+        { $match: { isFeatured: false } },
         { $sample: { size: 15 } },
         { $addFields: { id: "$_id" } },
         {
