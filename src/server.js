@@ -21,7 +21,7 @@ app.use(express.json()).use(cookieParser());
 app.use(express.static("public"));
 app.use(express.static("uploads"));
 
-let whitelist = ["http://localhost:5173", "http://localhost:5174", "https://q9bwjgg7-5173.asse.devtunnels.ms"]
+let whitelist = ["http://localhost:5173", "http://localhost:5174", "https://marketplace-client-fho1.vercel.app"]
 const corsOptions = {
   origin: function (
     origin,
