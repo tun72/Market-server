@@ -10,6 +10,8 @@ const dotenv = require("dotenv");
 const routes = require("./routes/v1/index");
 const Admin = require("./models/adminModel");
 const { generateRandToken } = require("./utils/generateToken");
+const orderModel = require("./models/orderModel");
+const cron = require("node-cron")
 
 
 dotenv.config();
@@ -21,7 +23,7 @@ app.use(express.json()).use(cookieParser());
 app.use(express.static("public"));
 app.use(express.static("uploads"));
 
-let whitelist = ["http://localhost:5173", "http://localhost:5174", "https://ayeyarmart.studentactivities.online", "http://150.95.81.76:5173"]
+let whitelist = ["http://localhost:5173", "http://localhost:5174", "https://ayeyarmart.studentactivities.online", "http://150.95.81.76:5173", "https://ayeyar-merchant.vercel.app"]
 const corsOptions = {
   origin: function (
     origin,
@@ -52,6 +54,29 @@ app.use(routes)
 app.get("/", (req, res) => {
   res.redirect(process.env.FRONTEND_URL)
 })
+
+
+const deleteExpiredOrdersDailyCron = () => {
+  // Run every 6 hours
+  cron.schedule('0 3 * * *', async () => {
+    console.log('🕒 Running frequent expired orders cleanup...');
+
+    try {
+      const deleteResult = await orderModel.deleteMany({
+        status: 'expired'
+      });
+
+      if (deleteResult.deletedCount > 0) {
+        console.log(`🗑️  Deleted ${deleteResult.deletedCount} expired orders`);
+      }
+
+    } catch (error) {
+      console.error('❌ Error during frequent cleanup:', error);
+    }
+  });
+};
+
+deleteExpiredOrdersDailyCron();
 
 app.use(globalErrorController);
 
