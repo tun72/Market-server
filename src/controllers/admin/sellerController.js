@@ -354,5 +354,7 @@ exports.getAllStripePayments = catchAsync(async (req, res, next) => {
 
 })
 
+
+
 // exports.updateSeller = factory.updateOne(Seller)
 // exports.deleteSeller = factory.deleteOne(Seller)

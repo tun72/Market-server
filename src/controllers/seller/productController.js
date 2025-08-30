@@ -16,6 +16,7 @@ const Seller = require("../../models/sellerModel");
 const sanitizeHtml = require("sanitize-html");
 
 const { decode } = require('html-entities');
+const Order = require("../../models/orderModel");
 
 
 
@@ -706,3 +707,126 @@ exports.PreInsertedProducts = catchAsync(async (req, res, next) => {
 
 })
 
+
+
+exports.getSaleSummary = catchAsync(async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        const seller = await Seller.findById(userId);
+
+        if (!seller) {
+            return next(new AppError("You're not allowed", 403));
+        }
+
+        const sellerId = seller._id;
+
+        // Get all products for this seller
+        const products = await Product.find({ merchant: sellerId });
+        const productIds = products.map(p => p._id);
+
+        // Get confirmed orders only (when products are actually sold)
+        const confirmedOrders = await Order.find({
+            productId: { $in: productIds },
+            status: { $in: ['confirmed', 'processing', 'shipped', 'delivered'] }
+        }).populate('productId', 'name price');
+
+        // Calculate sold products details
+        const soldProductsMap = new Map();
+        let totalAmount = 0;
+        let totalCodAmount = 0;
+        let totalStripeAmount = 0;
+        let totalQuantitySold = 0;
+
+        // Process each confirmed order
+        for (const order of confirmedOrders) {
+            const product = order.productId;
+            const productId = product._id.toString();
+            const orderValue = product.price * order.quantity;
+
+            // Add to total amounts
+            totalAmount += orderValue;
+            totalQuantitySold += order.quantity;
+
+            if (order.payment === 'cod') {
+                totalCodAmount += orderValue;
+            } else if (order.payment === 'stripe') {
+                totalStripeAmount += orderValue;
+            }
+
+            // Track sold product details
+            if (soldProductsMap.has(productId)) {
+                const existing = soldProductsMap.get(productId);
+                existing.quantitySold += order.quantity;
+                existing.totalRevenue += orderValue;
+                existing.orderCount += 1;
+
+                if (order.payment === 'cod') {
+                    existing.codSales += order.quantity;
+                    existing.codRevenue += orderValue;
+                } else if (order.payment === 'stripe') {
+                    existing.stripeSales += order.quantity;
+                    existing.stripeRevenue += orderValue;
+                }
+            } else {
+                soldProductsMap.set(productId, {
+                    id: product._id,
+                    name: product.name,
+                    price: product.price,
+                    quantitySold: order.quantity,
+                    totalRevenue: orderValue,
+                    orderCount: 1,
+                    codSales: order.payment === 'cod' ? order.quantity : 0,
+                    stripeSales: order.payment === 'stripe' ? order.quantity : 0,
+                    codRevenue: order.payment === 'cod' ? orderValue : 0,
+                    stripeRevenue: order.payment === 'stripe' ? orderValue : 0
+                });
+            }
+        }
+
+        // Convert map to array and sort by quantity sold
+        const soldProducts = Array.from(soldProductsMap.values())
+            .map(product => ({
+                ...product,
+                totalRevenue: Math.round(product.totalRevenue * 100) / 100,
+                codRevenue: Math.round(product.codRevenue * 100) / 100,
+                stripeRevenue: Math.round(product.stripeRevenue * 100) / 100
+            }))
+            .sort((a, b) => b.quantitySold - a.quantitySold);
+
+        // Prepare summary response
+        const summary = {
+            overview: {
+                totalProducts: products.length,
+                soldProducts: soldProducts.length,
+                totalQuantitySold,
+                totalAmount: Math.round(totalAmount * 100) / 100,
+                totalCodAmount: Math.round(totalCodAmount * 100) / 100,
+                totalStripeAmount: Math.round(totalStripeAmount * 100) / 100,
+                totalOrders: confirmedOrders.length
+            },
+            soldProducts,
+            paymentBreakdown: {
+                cod: {
+                    amount: Math.round(totalCodAmount * 100) / 100,
+                    percentage: totalAmount > 0 ? ((totalCodAmount / totalAmount) * 100).toFixed(2) : 0,
+                    orders: confirmedOrders.filter(o => o.payment === 'cod').length
+                },
+                stripe: {
+                    amount: Math.round(totalStripeAmount * 100) / 100,
+                    percentage: totalAmount > 0 ? ((totalStripeAmount / totalAmount) * 100).toFixed(2) : 0,
+                    orders: confirmedOrders.filter(o => o.payment === 'stripe').length
+                }
+            }
+        };
+
+        res.status(200).json({
+            success: true,
+            data: summary
+        });
+
+    } catch (error) {
+        console.error('Error fetching seller summary:', error);
+        return next(new AppError('Internal server error', 500));
+    }
+});
