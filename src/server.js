@@ -10,6 +10,8 @@ const dotenv = require("dotenv");
 const routes = require("./routes/v1/index");
 const Admin = require("./models/adminModel");
 const { generateRandToken } = require("./utils/generateToken");
+const orderModel = require("./models/orderModel");
+const cron = require("node-cron")
 
 
 dotenv.config();
@@ -52,6 +54,29 @@ app.use(routes)
 app.get("/", (req, res) => {
   res.redirect(process.env.FRONTEND_URL)
 })
+
+
+const deleteExpiredOrdersDailyCron = () => {
+  // Run every 6 hours
+  cron.schedule('0 3 * * *', async () => {
+    console.log('🕒 Running frequent expired orders cleanup...');
+
+    try {
+      const deleteResult = await orderModel.deleteMany({
+        status: 'expired'
+      });
+
+      if (deleteResult.deletedCount > 0) {
+        console.log(`🗑️  Deleted ${deleteResult.deletedCount} expired orders`);
+      }
+
+    } catch (error) {
+      console.error('❌ Error during frequent cleanup:', error);
+    }
+  });
+};
+
+deleteExpiredOrdersDailyCron();
 
 app.use(globalErrorController);
 
