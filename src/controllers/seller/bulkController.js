@@ -8,7 +8,6 @@ const AppError = require("../../utils/appError");
 const Seller = require("../../models/sellerModel");
 const { createOneProduct, checkSpelling } = require("../../services/productServices");
 
-
 const sseConnections = new Map();
 
 function validateRecord(record) {
@@ -57,7 +56,6 @@ async function processRecord(record, sessionId, merchantId) {
 
         let images = [];
 
-
         const type = await getTypeByName(record.type);
 
         if (!type) {
@@ -99,9 +97,16 @@ async function processRecord(record, sessionId, merchantId) {
 
 function sendSSEUpdate(sessionId, data) {
     const connection = sseConnections.get(sessionId);
-    if (connection && !connection.destroyed) {
+    if (connection && !connection.destroyed && !connection.writableEnded) {
         try {
-            connection.write(`data: ${JSON.stringify(data)}\n\n`);
+            // Add proper SSE formatting with id and retry
+            const sseData = `id: ${Date.now()}\ndata: ${JSON.stringify(data)}\n\n`;
+            connection.write(sseData);
+
+            // Force flush the data
+            if (connection.flush) {
+                connection.flush();
+            }
         } catch (error) {
             console.error('Error sending SSE update:', error);
             sseConnections.delete(sessionId);
@@ -112,11 +117,28 @@ function sendSSEUpdate(sessionId, data) {
 async function processCSVFile(filePath, sessionId, uploadSession, merchant, total, res) {
     return new Promise((resolve, reject) => {
         let lineNumber = 0;
-        let activeProcessing = 0; // Track active async operations
-        let streamEnded = false;
+        let processedCount = 0;
+        const batchSize = 5; // Process in smaller batches
+        const recordQueue = [];
 
-        const checkCompletion = async () => {
-            if (streamEnded && activeProcessing === 0) {
+        const processBatch = async () => {
+            if (recordQueue.length === 0) return;
+
+            const batch = recordQueue.splice(0, batchSize);
+
+            for (const { record, currentLineNumber } of batch) {
+                try {
+                    await processCSVRecord(record, currentLineNumber, sessionId, uploadSession, merchant, total);
+                    processedCount++;
+                } catch (error) {
+                    console.error(`Error processing line ${currentLineNumber}:`, error);
+                    await handleRecordError(error, record, currentLineNumber, sessionId, uploadSession, total);
+                    processedCount++;
+                }
+            }
+
+            // Check if we're done
+            if (processedCount >= lineNumber && streamEnded) {
                 try {
                     await handleStreamEnd(sessionId, uploadSession, lineNumber, filePath, res);
                     resolve();
@@ -124,30 +146,36 @@ async function processCSVFile(filePath, sessionId, uploadSession, merchant, tota
                     console.error('Error completing upload session:', error);
                     reject(error);
                 }
+            } else if (recordQueue.length > 0) {
+                // Process next batch
+                setImmediate(processBatch);
             }
         };
 
+        let streamEnded = false;
+
         const stream = fs.createReadStream(filePath)
             .pipe(csv())
-            .on('data', async (record) => {
-                stream.pause();
+            .on('data', (record) => {
                 lineNumber++;
-                activeProcessing++;
+                recordQueue.push({ record, currentLineNumber: lineNumber });
 
-                try {
-                    await processCSVRecord(record, lineNumber, sessionId, uploadSession, merchant, total);
-                } catch (error) {
-                    console.error(`Error processing line ${lineNumber}:`, error);
-                    await handleRecordError(error, record, lineNumber, sessionId, uploadSession, total);
-                } finally {
-                    activeProcessing--;
-                    stream.resume();
-                    await checkCompletion();
+                // Start processing if this is the first batch
+                if (recordQueue.length === batchSize) {
+                    setImmediate(processBatch);
                 }
             })
-            .on('end', async () => {
+            .on('end', () => {
                 streamEnded = true;
-                await checkCompletion();
+                // Process remaining records
+                if (recordQueue.length > 0) {
+                    setImmediate(processBatch);
+                } else if (processedCount >= lineNumber) {
+                    // No records to process, complete immediately
+                    handleStreamEnd(sessionId, uploadSession, lineNumber, filePath, res)
+                        .then(resolve)
+                        .catch(reject);
+                }
             })
             .on('error', async (error) => {
                 try {
@@ -192,6 +220,7 @@ async function processCSVRecord(record, lineNumber, sessionId, uploadSession, me
                 result = await processRecord(record, sessionId, merchant._id);
             }
         }
+
         if (result.success) {
             uploadSession.successfulRecords = (uploadSession.successfulRecords || 0) + 1;
         } else {
@@ -206,7 +235,13 @@ async function processCSVRecord(record, lineNumber, sessionId, uploadSession, me
         }
 
         uploadSession.processedRecords = (uploadSession.processedRecords || 0) + 1;
-        uploadSession.totalRecords = lineNumber;
+        uploadSession.totalRecords = Math.max(uploadSession.totalRecords || 0, lineNumber);
+
+        // Send update with proper calculation
+        const progressPercentage = total > 0 ?
+            Math.round((uploadSession.processedRecords / total) * 100) :
+            Math.round((uploadSession.processedRecords / lineNumber) * 100);
+
         sendSSEUpdate(sessionId, {
             type: 'progress',
             sessionId,
@@ -219,14 +254,16 @@ async function processCSVRecord(record, lineNumber, sessionId, uploadSession, me
                 status: result.success ? 'success' : 'failed',
                 error: result.success ? null : result.error
             },
-            progress: Math.round((uploadSession.processedRecords / total) * 100)
+            progress: progressPercentage
         });
-        if (uploadSession.processedRecords % 10 === 0) {
+
+        // Save less frequently to improve performance
+        if (uploadSession.processedRecords % 25 === 0) {
             await uploadSession.save();
         }
 
     } catch (error) {
-        throw error; // Re-throw to be handled by the caller
+        throw error;
     }
 }
 
@@ -242,7 +279,11 @@ async function handleRecordError(error, record, lineNumber, sessionId, uploadSes
     uploadSession.bulkUploadErrors.push(errorRecord);
     uploadSession.failedRecords = (uploadSession.failedRecords || 0) + 1;
     uploadSession.processedRecords = (uploadSession.processedRecords || 0) + 1;
-    uploadSession.totalRecords = lineNumber;
+    uploadSession.totalRecords = Math.max(uploadSession.totalRecords || 0, lineNumber);
+
+    const progressPercentage = total > 0 ?
+        Math.round((uploadSession.processedRecords / total) * 100) :
+        Math.round((uploadSession.processedRecords / lineNumber) * 100);
 
     sendSSEUpdate(sessionId, {
         type: 'progress',
@@ -256,10 +297,10 @@ async function handleRecordError(error, record, lineNumber, sessionId, uploadSes
             status: 'failed',
             error: error.message
         },
-        progress: Math.round((uploadSession.processedRecords / total) * 100)
+        progress: progressPercentage
     });
 
-    if (uploadSession.processedRecords % 10 === 0) {
+    if (uploadSession.processedRecords % 25 === 0) {
         await uploadSession.save();
     }
 }
@@ -272,20 +313,34 @@ async function handleStreamEnd(sessionId, uploadSession, totalLines, filePath, r
     await uploadSession.save();
 
     // Send completion update
-    const processingTime = uploadSession.endTime - uploadSession.startTime;
     sendSSEUpdate(sessionId, {
         type: 'completed',
         sessionId,
+        processed: uploadSession.processedRecords,
+        success: uploadSession.successfulRecords || 0,
+        failed: uploadSession.failedRecords || 0,
+        totalRecords: totalLines
     });
 
+    // Keep connection alive a bit longer for final message delivery
     setTimeout(() => {
+        // Clean up file
         fs.unlink(filePath, (err) => {
             if (err) console.error('Error deleting file:', err);
         });
 
+        // Close SSE connection
         setTimeout(() => {
+            const connection = sseConnections.get(sessionId);
+            if (connection && !connection.destroyed) {
+                try {
+                    connection.write('data: {"type":"close"}\n\n');
+                    connection.end();
+                } catch (err) {
+                    console.error('Error closing SSE connection:', err);
+                }
+            }
             sseConnections.delete(sessionId);
-            res.end()
         }, 2000);
     }, 1000);
 }
@@ -306,13 +361,23 @@ async function handleStreamError(error, sessionId, uploadSession, filePath) {
 
     // Clean up with delay
     setTimeout(() => {
-        sseConnections.delete(sessionId);
+        // Clean up file
         fs.unlink(filePath, (err) => {
             if (err) console.error('Error deleting file:', err);
         });
+
+        // Close connection
+        const connection = sseConnections.get(sessionId);
+        if (connection && !connection.destroyed) {
+            try {
+                connection.end();
+            } catch (err) {
+                console.error('Error closing SSE connection:', err);
+            }
+        }
+        sseConnections.delete(sessionId);
     }, 1000);
 }
-
 
 exports.BulkUpload = catchAsync(async (req, res, next) => {
     if (!req.file) {
@@ -345,25 +410,67 @@ exports.BulkUpload = catchAsync(async (req, res, next) => {
         });
         await uploadSession.save();
 
-        // Set up SSE
+        // Set up SSE with proper headers for HTTPS
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Connection': 'keep-alive',
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type'
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'X-Accel-Buffering': 'no', // Disable nginx buffering
+            'Transfer-Encoding': 'chunked'
+        });
+
+        // Disable timeout for long-running processes
+        res.setTimeout(0);
+
+        // Handle client disconnect
+        req.on('close', () => {
+            console.log(`Client disconnected for session ${sessionId}`);
+            sseConnections.delete(sessionId);
+        });
+
+        req.on('error', (error) => {
+            console.error(`Request error for session ${sessionId}:`, error);
+            sseConnections.delete(sessionId);
         });
 
         sseConnections.set(sessionId, res);
 
+        // Send initial connection message
         sendSSEUpdate(sessionId, {
             type: 'connected',
             sessionId,
             message: 'Connection established, starting file processing...'
         });
 
+        // Send heartbeat to keep connection alive
+        const heartbeatInterval = setInterval(() => {
+            const connection = sseConnections.get(sessionId);
+            if (connection && !connection.destroyed && !connection.writableEnded) {
+                try {
+                    connection.write(': heartbeat\n\n');
+                } catch (error) {
+                    console.error('Heartbeat error:', error);
+                    clearInterval(heartbeatInterval);
+                    sseConnections.delete(sessionId);
+                }
+            } else {
+                clearInterval(heartbeatInterval);
+            }
+        }, 30000); // Send heartbeat every 30 seconds
+
+        // Store interval reference for cleanup
+        if (!res.heartbeatInterval) {
+            res.heartbeatInterval = heartbeatInterval;
+        }
+
         // Process the CSV file
         await processCSVFile(filePath, sessionId, uploadSession, merchant, total, res);
+
+        // Clean up heartbeat
+        clearInterval(heartbeatInterval);
 
     } catch (error) {
         console.error('Bulk upload error:', error);
@@ -380,8 +487,21 @@ exports.BulkUpload = catchAsync(async (req, res, next) => {
                 sessionId,
                 error: error.message
             });
+
+            // Clean up connection
+            setTimeout(() => {
+                const connection = sseConnections.get(sessionId);
+                if (connection && !connection.destroyed) {
+                    try {
+                        connection.end();
+                    } catch (err) {
+                        console.error('Error closing connection:', err);
+                    }
+                }
+                sseConnections.delete(sessionId);
+            }, 1000);
         }
 
-        next(new AppError(error.message, 400));
+        return next(new AppError(error.message, 400));
     }
 });
