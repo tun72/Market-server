@@ -63,7 +63,7 @@ exports.getStatus = catchAsync(async (req, res) => {
             }
         ]);
 
-        console.log(revenueStats);
+
 
 
         // 2. Total Orders Aggregation
@@ -140,13 +140,13 @@ exports.getStatus = catchAsync(async (req, res) => {
             ])
         ]);
 
-        console.log(currentMonthUsers, lastMonthUsers);
+
 
 
         // 4. Total Products Count
         const totalProducts = await Product.countDocuments({ merchant: merchantId });
 
-        console.log(totalProducts);
+
 
 
         // Calculate percentage changes
@@ -182,7 +182,7 @@ exports.getStatus = catchAsync(async (req, res) => {
         };
 
         res.json({
-            success: true,
+            isSuccess: true,
             ...stats,
             timestamp: new Date().toISOString()
         });
@@ -190,7 +190,7 @@ exports.getStatus = catchAsync(async (req, res) => {
     } catch (error) {
         console.error('Error fetching dashboard stats:', error);
         res.status(500).json({
-            success: false,
+            isSuccess: false,
             message: 'Error fetching dashboard statistics',
             error: error.message
         });
@@ -222,44 +222,47 @@ exports.getRevenueAndOrderChart = catchAsync(async (req, res, next) => {
                     status: "confirm"
                 }
             },
-            // {
-            //     $lookup: {
-            //         from: "products",
-            //         localField: "productId",
-            //         foreignField: "_id",
-            //         as: "productDetails"
-            //     }
-            // },
-            // { $unwind: "$productDetails" },
-            // {
-            //     $addFields: {
-            //         totalPrice: {
-            //             $multiply: [
-            //                 "$quantity",
-            //                 { $add: ["$productDetails.price", "$productDetails.shipping"] }
-            //             ]
-            //         }
-            //     }
-            // },
-            // {
-            //     $group: {
-            //         _id: { month: { $month: "$createdAt" } },
-            //         revenue: { $sum: "$totalPrice" },
-            //         orders: { $sum: 1 }
-            //     }
-            // },
-            // {
-            //     $project: {
-            //         month: "$_id.month",
-            //         revenue: 1,
-            //         orders: 1,
-            //         _id: 0
-            //     }
-            // },
-            // { $sort: { month: 1 } }
+            {
+                $lookup: {
+                    from: "products",
+                    localField: "productId",
+                    foreignField: "_id",
+                    as: "productDetails"
+                }
+            },
+            { $unwind: "$productDetails" },
+            {
+                $addFields: {
+                    totalPrice: {
+                        $multiply: [
+                            "$quantity",
+                            { $add: ["$productDetails.price", "$productDetails.shipping"] }
+                        ]
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: { month: { $month: "$createdAt" } },
+                    revenue: { $sum: "$totalPrice" },
+                    orders: { $sum: 1 }
+                }
+            },
+            {
+                $project: {
+                    month: "$_id.month",
+                    revenue: 1,
+                    orders: 1,
+                    _id: 0
+                }
+            },
+            { $sort: { month: 1 } }
         ]);
 
-        console.log(monthlyStats.length);
+
+
+        const currentMonthIndex = new Date().getMonth();
+
 
 
         // Map results into your desired format
@@ -272,12 +275,16 @@ exports.getRevenueAndOrderChart = catchAsync(async (req, res, next) => {
             };
         });
 
+        const rotatedMonths = [
+            ...chartData.slice(currentMonthIndex),
+            // ...chartData.slice(0, currentMonthIndex)
+        ];
 
         // ---------- Final Response ----------
         res.json({
             isSuccess: true,
             // totalRevenue: revenueStats[0]?.totalRevenue || 0,
-            chartData, // 👈 new data
+            chartData: rotatedMonths, // 👈 new data
             timestamp: new Date().toISOString()
         });
 

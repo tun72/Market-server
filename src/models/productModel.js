@@ -5,6 +5,9 @@ const { ObjectId } = Schema.Types;
 const typeSchema = new Schema({
     name: { type: String, required: true, unique: true },
     image: { type: String, required: true }
+}, {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
 
@@ -68,15 +71,8 @@ const productSchema = new Schema({
         type: ObjectId,
         ref: "Tag"
     }],
-    colors: [{
-        type: String
-    }],
-    sizes: [{
-        type: String
-    }],
     images: [{
         type: String,
-        required: true,
     }],
     price: {
         type: Number,
@@ -140,8 +136,6 @@ const productSchema = new Schema({
 
 
 productSchema.virtual('optimize_images').get(function () {
-    console.log("hit");
-
     return this?.images ? this.images.map((img) => img.split(".")[0] + ".webp") : undefined
 });
 
@@ -149,6 +143,10 @@ typeSchema.virtual('categories', {
     ref: 'Type',
     localField: '_id',
     foreignField: 'typeId'
+});
+
+typeSchema.virtual('optimize_images').get(function () {
+    return this?.image ? this.image.split(".")[0] + ".webp" : undefined
 });
 
 

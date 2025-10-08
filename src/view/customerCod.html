@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>New COD Order Received</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      color: #222;
+    "
+  >
+    <table
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #ddd;
+      "
+    >
+      <tr>
+        <td
+          align="center"
+          style="background-color: #2e7d32; padding: 24px; color: #ffffff"
+        >
+          <h1 style="margin: 0; font-size: 24px">AyeyarMart</h1>
+          <p style="margin: 8px 0 0">New COD Order Received</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 24px">
+          <div
+            style="
+              display: inline-block;
+              padding: 6px 14px;
+              background-color: #fef3c7;
+              color: #d97706;
+              border-radius: 999px;
+              font-weight: bold;
+              font-size: 14px;
+            "
+          >
+            💰 Cash on Delivery
+          </div>
+
+          <p style="margin: 16px 0; font-size: 16px; color: #374151">
+            Hello you have received a new Cash on Delivery order that requires
+            your attention.
+          </p>
+
+          <table
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            style="
+              margin-top: 20px;
+              background: #f4f4f4;
+              border: 1px solid #ddd;
+              padding: 16px;
+            "
+          >
+            <tr>
+              <td style="padding: 6px 0; font-size: 14px; color: #555">
+                Order Date
+              </td>
+              <td style="padding: 6px 0; font-weight: bold">${{date}}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; font-size: 14px; color: #555">
+                Order ID
+              </td>
+              <td style="padding: 6px 0; font-weight: bold">${{orderCode}}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; font-size: 14px; color: #555">
+                Customer
+              </td>
+              <td style="padding: 6px 0; font-weight: bold">
+                ${{customerName}}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; font-size: 14px; color: #555">
+                Phone
+              </td>
+              <td style="padding: 6px 0; font-weight: bold">
+                ${{customerPhone}}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; font-size: 14px; color: #555">
+                Items
+              </td>
+              <td style="padding: 6px 0; font-weight: bold">
+                ${{totalProducts}} Products
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; font-size: 14px; color: #555">
+                Payment Method
+              </td>
+              <td style="padding: 6px 0; font-weight: bold">
+                Cash on Delivery
+              </td>
+            </tr>
+            <tr>
+              <td
+                colspan="2"
+                style="
+                  border-top: 1px solid #ddd;
+                  padding: 16px 0 0;
+                  font-size: 16px;
+                  color: #2e7d32;
+                  font-weight: bold;
+                "
+              >
+                Amount to Collect: ${{totalAmount}}
+              </td>
+            </tr>
+          </table>
+
+          <div
+            style="
+              margin: 24px 0;
+              padding: 16px;
+              background: #fffbeb;
+              border-left: 4px solid #2e7d32;
+            "
+          >
+            <h3 style="margin: 0 0 8px; font-size: 16px; color: #92400e">
+              Delivery Information
+            </h3>
+            <p style="margin: 0; font-size: 14px; color: #555">
+              <strong>Address:</strong> ${{deliveryAddress}}<br />
+            </p>
+          </div>
+
+          <div style="margin-top: 24px">
+            <p style="margin: 0 0 12px; font-weight: bold; color: #374151">
+              Next Steps:
+            </p>
+            <ul
+              style="
+                margin: 0;
+                padding-left: 20px;
+                font-size: 14px;
+                color: #555;
+              "
+            >
+              <li>Prepare the items for delivery</li>
+              <li>Confirm delivery schedule with customer</li>
+              <li>Collect payment upon delivery</li>
+              <li>Update order status once completed</li>
+            </ul>
+          </div>
+
+          <div style="text-align: center; margin-top: 32px">
+            <a
+              href="${{orderManagementUrl}}"
+              style="
+                display: inline-block;
+                padding: 12px 24px;
+                background-color: #2e7d32;
+                color: #ffffff;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: bold;
+              "
+            >
+              Manage Order Now
+            </a>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td
+          align="center"
+          style="
+            padding: 20px;
+            background: #f4f4f4;
+            font-size: 14px;
+            color: #777;
+          "
+        >
+          <p style="margin: 0 0 8px">Questions about this order?</p>
+          <p style="margin: 0 0 8px">
+            <a href="#" style="color: #2e7d32; text-decoration: none"
+              >Contact AyeyarMart Support</a
+            >
+          </p>
+          <p style="margin: 0">© 2025 AyeyarMarket. All rights reserved.</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

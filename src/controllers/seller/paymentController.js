@@ -95,7 +95,7 @@ exports.createPaymentMethod = [
             active: true
         }
 
-        console.log(data);
+
 
 
         await PaymentCategory.create(data)
@@ -251,7 +251,7 @@ exports.getPaymentMethodById = [
             next(new AppError("You'r not allowed this action."), 403)
         }
 
-        console.log("hit");
+
 
 
         const isExist = await PaymentCategory.findOne({ merchant: merchant.id, _id: new mongoose.Types.ObjectId(id) })
@@ -260,7 +260,6 @@ exports.getPaymentMethodById = [
             next(new AppError("You'r not allowed this action", 403))
         }
 
-        console.log(isExist);
 
         next()
     }), factory.getOne({
@@ -283,23 +282,28 @@ exports.withDraw = [
         }
 
         const userId = req.userId;
-        const merchant = await Seller.findById(userId)
+        const merchant = await Seller.findById(userId).select("+balance")
         if (!merchant) {
             next(new AppError("You'r not allowed this action."), 403)
         }
 
+        let amount = +req.body.amount;
+        let data = req.body
 
-        let data = req.body;
+
         const paymentMethod = await PaymentCategory.findById(data.paymentMethodId);
         if (!paymentMethod) {
             return next(new AppError("Payment not found", 409));
         }
 
-        if (data.amount <= 0) {
+        if (amount <= 0) {
             return next(new AppError("INVALID_PAYMENT_AMOUNT", 400));
         }
 
-        if (data.amount > merchant.amount) {
+
+
+
+        if (amount > merchant.balance) {
             return next(new AppError("PAYMENT_INSUFFICIENT_FUNDS", 402));
         }
 
@@ -323,15 +327,15 @@ exports.withDraw = [
         await Withdraw.create({
             merchant: merchant.id,
             paymentCategory: paymentMethod._id,
-            amount: data.amount
+            amount: amount
         })
 
-        // await PaymentHistory.create({
-        //     merchant: merchant.id,
-        //     paymentMethod: paymentMethod.pyMethod,
-        //     amount: data.amount,
-        //     status: "withdraw"
-        // })
+        await Seller.updateOne(
+            { _id: merchant._id },
+            { $inc: { balance: -amount } }
+        );
+
+
 
         return res.status(200).json({ isSuccess: true, message: "WithDraw created Successfully. Please wait for admin confirm." })
     })]
@@ -352,3 +356,14 @@ exports.getAllWithDraw = [
         fields: ["paymentCategory",],
     })
 ]
+
+
+// total amount
+exports.getTotalAmount = catchAsync(async (req, res, next) => {
+    const userId = req.userId;
+    const merchant = await Seller.findById(userId).select("+balance")
+    if (!merchant) {
+        next(new AppError("You'r not allowed this action."), 403)
+    }
+    return res.status(200).json({ isSuccess: true, totalAmount: merchant.balance })
+})

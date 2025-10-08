@@ -27,42 +27,51 @@ exports.createAd = [
                 removeImages(originalFiles)
             }
 
+            if (req.files["companyImg"] && req.files["companyImg"].length > 0) {
+                const originalFiles = [req.files["image"][0].filename]
+                removeImages(originalFiles)
+            }
+
 
             return next(new AppError(errors[0].msg, 400));
         }
 
         let { link, company, product } = req.body;
-        checkPhotoIfNotExistFields(req.files, ["image"])
+        checkPhotoIfNotExistFields(req.files, ["image", "companyImg"])
 
         // need to create aws s3 
         // image optimize
 
-        const splitName = req.files["image"][0].filename.split(".")[0] + ".webp"
-        await ImageQueue.add("optimize-image", {
-            filePath: req.files["image"][0].path,
-            fileName: splitName,
-            width: 835,
-            height: 577,
-            quality: 100,
-        }, {
-            attempts: 3,
-            backoff: {
-                type: "exponential",
-                delay: 1000,
-            },
-        })
+        const fileNames = ["image", "companyImg"]
+        await Promise.all(fileNames.map(async (file) => {
+            const splitName = req.files[file][0].filename.split(".")[0] + ".webp"
+            await ImageQueue.add("optimize-image", {
+                filePath: req.files[file][0].path,
+                fileName: splitName,
+                width: 835,
+                height: 577,
+                quality: 100,
+            }, {
+                attempts: 3,
+                backoff: {
+                    type: "exponential",
+                    delay: 1000,
+                },
+            })
+        }))
 
 
         const image = req.files["image"][0].filename
+        const companyImg = req.files["companyImg"][0].filename
 
 
-        console.log(image);
 
         const data = {
             link: decode(link),
             image,
             company,
-            product
+            product,
+            companyImg
         }
 
         const ad = await Ad.create(data)
@@ -89,6 +98,12 @@ exports.updateAd = [
             }
 
 
+            if (req.files["companyImg"] && req.files["companyImg"].length > 0) {
+                const originalFiles = [req.files["image"][0].filename]
+                removeImages(originalFiles)
+            }
+
+
             return next(new AppError(errors[0].msg, 400));
         }
 
@@ -101,28 +116,41 @@ exports.updateAd = [
             if (req.files["image"]) {
                 removeImages([req.files["image"][0].filename])
             }
+
+            if (req.files["companuImg"]) {
+                removeImages([req.files["image"][0].filename])
+            }
+
             return next(new AppError("Ads not found", 409));
         }
 
 
-        if (req.files["image"]) {
-            const splitName = req.files["image"][0].filename.split(".")[0] + ".webp"
-            removeImages([ads["image"]], [ads["image"].split(".")[0] + ".webp"])
-            data["image"] = req.files["image"][0].filename;
+        const fileNames = ["image", "companyImg"]
 
-            await ImageQueue.add("optimize-image", {
-                filePath: req.files["image"][0].path,
-                fileName: splitName,
-                width: 835,
-                height: 577,
-                quality: 100,
-            }, {
-                attempts: 3,
-                backoff: {
-                    type: "exponential",
-                    delay: 1000,
-                },
-            })
+        if (req.files) {
+            await Promise.all(fileNames.map(async (file) => {
+                if (req.files[file]) {
+                    const splitName = req.files[file][0].filename.split(".")[0] + ".webp"
+                    removeImages([ads[file]], [ads[file].split(".")[0] + ".webp"])
+                    data[file] = req.files[file][0].filename;
+
+                    await ImageQueue.add("optimize-image", {
+                        filePath: req.files[file][0].path,
+                        fileName: splitName,
+                        width: 835,
+                        height: 577,
+                        quality: 100,
+                    }, {
+                        attempts: 3,
+                        backoff: {
+                            type: "exponential",
+                            delay: 1000,
+                        },
+                    })
+                }
+
+            }))
+
         }
 
         data.link = decode(data.link)
@@ -146,7 +174,7 @@ exports.deleteAd = [
         let data = req.body;
         const ads = await Ad.findById(data.id);
         if (!ads) {
-            return next(new AppError("Seller not found", 409));
+            return next(new AppError("Ads not found", 409));
         }
 
         const originalFiles = [ads.image];
@@ -156,3 +184,5 @@ exports.deleteAd = [
         res.status(200).json({ message: "Ad is successfully deleted", isSuccess: true })
 
     })]
+
+

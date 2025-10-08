@@ -121,7 +121,7 @@ exports.getCart = catchAsync(async (req, res, next) => {
         }
     }).select("products.quantity products.productId")
 
-    console.log(cart);
+
 
     if (!cart) {
         return next(new AppError("There are no items in this cart", 400))
@@ -130,7 +130,8 @@ exports.getCart = catchAsync(async (req, res, next) => {
 
     res.status(200).json({
         status: "success",
-        data: cart
+        data: cart,
+        isSuccess: true
     });
 
 

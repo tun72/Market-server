@@ -11,8 +11,11 @@ const Seller = require("../../models/sellerModel");
 const orderQueue = require("../../jobs/queues/OrderQueue");
 const mongoose = require("mongoose");
 const emailQueue = require("../../jobs/queues/EmailQueue");
-const { getEmailContent } = require("../../utils/sendMail");
+const { getEmailContent, getCodContent } = require("../../utils/sendMail");
 const { PaymentHistory } = require("../../models/paymentCategoryModel");
+const Analytic = require("../../models/userAnalyticsModel");
+const { getSocket, userSocketMap } = require("../../socket");
+const Customer = require("../../models/customerModel");
 dotenv.config()
 
 // Calculate total price including shipping and discount
@@ -64,6 +67,7 @@ exports.getOrderByCode = catchAsync(async (req, res, next) => {
             total
         };
     });
+
 
     res.status(200).json({
         status: "success",
@@ -151,6 +155,9 @@ exports.createOrder = [
                 const [quantity, productId] = id.split("_");
                 const parsedQuantity = Number(quantity);
 
+
+
+
                 if (!productId || isNaN(parsedQuantity) || parsedQuantity <= 0) {
                     throw new Error("Invalid product format");
                 }
@@ -158,6 +165,8 @@ exports.createOrder = [
                 return { id: productId.trim(), quantity: parsedQuantity };
             });
         } catch (error) {
+
+
             next(new AppError("Invalid product format", 400));
         }
 
@@ -579,6 +588,10 @@ exports.cashOnDelivery = [
         }
 
         const userId = req.userId
+        const user = await Customer.findById(userId)
+
+        console.log(user);
+
 
         const { code } = req.body
 
@@ -587,7 +600,7 @@ exports.cashOnDelivery = [
             status: "pending",
             userId: userId,
             isPaid: false,
-        })
+        }).populate("merchant")
 
         if (!orders || orders.length === 0) {
             throw new AppError("Invalid order code or no pending orders found.", 400);
@@ -600,13 +613,11 @@ exports.cashOnDelivery = [
 
 
 
-
-
         const productIds = orders.map(order => order.productId);
 
         const products = await Product.find({
             _id: { $in: productIds }
-        })
+        }).select("_id merchant inventory name category price shipping")
 
         if (!products || products.length === 0) {
             throw new AppError("No valid products found for this order.", 400);
@@ -659,7 +670,7 @@ exports.cashOnDelivery = [
                                     reservedInventory: -order.quantity
                                 }
                             },
-                            { session }
+                            { session: mongoSession }
                         );
                     }
                 });
@@ -674,7 +685,119 @@ exports.cashOnDelivery = [
                 await mongoSession.endSession();
             }
         }
-        await Order.updateMany({ code }, { status: "processing", payment: "cod" })
+        await Order.updateMany({ code }, { status: "order placed", payment: "cod" })
+
+        if (products.length > 0) {
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const endOfDay = new Date();
+            endOfDay.setHours(23, 59, 59, 999);
+
+            await Promise.all(
+                products.map(async (product) => {
+                    const isAlreadyExist = await Analytic.findOne({
+                        product: product._id,
+                        user: req.userId,
+                        category: product.category,
+                        status: "order",
+                        createdAt: { $gte: startOfDay, $lte: endOfDay }
+                    });
+
+                    if (!isAlreadyExist) {
+                        await Analytic.create({
+                            user: req.userId,
+                            product: product._id,
+                            status: "order",
+                            category: product.category
+                        });
+                    }
+                })
+            );
+        }
+
+        const io = getSocket();
+        const date = new Date();
+        const formattedDate = date.toLocaleString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true
+        });
+
+        await Promise.all(
+            orders.map(async (order) => {
+                try {
+                    const product = productMap[order.productId.toString()];
+
+                    // Early return if product not found
+                    if (!product) {
+                        console.warn(`Product not found for order ${order.code}`);
+                        return;
+                    }
+
+                    const merchantId = userSocketMap.get(product.merchant);
+
+                    // Only emit if merchant is connected
+                    if (merchantId) {
+                        io.to(merchantId).emit("push-notification", {
+                            message: "You have new cash on delivery order. Please check.",
+                            link: "/dashboard/orders"
+                        });
+                    }
+
+                    // Optimize calculations - avoid unnecessary operations
+                    const amount = Math.round(product.price * 100);
+                    const shippingFee = product.shipping * 100;
+                    const total = ((amount + shippingFee) * order.quantity) / 100;
+
+                    // Pre-compute address string to avoid repeated concatenation
+                    const deliveryAddress = `${user.shippingAddresse.street}, ${user.shippingAddresse.city}, ${user.shippingAddresse.state}`;
+
+                    const data = {
+                        date: formattedDate,
+                        code: order.code,
+                        customerName: user.name,
+                        customerPhone: user?.phone ?? "",
+                        totalProducts: order.quantity,
+                        totalAmount: total,
+                        deliveryAddress: deliveryAddress
+                    };
+
+                    // Parallel execution of email content generation and queue addition
+                    const emailContent = await getCodContent({
+                        filename: "customerCod.html",
+                        data: data
+                    });
+
+                    // Add to email queue with optimized options
+                    await emailQueue.add(
+                        "email-user",
+                        {
+                            receiver: order.merchant.email,
+                            subject: "You have a new Order",
+                            html: emailContent,
+                        },
+                        {
+                            removeOnComplete: 5, // Reduced from default
+                            removeOnFail: 100,   // Reduced from 1000
+                            attempts: 3,         // Add retry attempts
+                            backoff: {
+                                type: 'exponential',
+                                delay: 2000
+                            }
+                        }
+                    );
+
+                } catch (error) {
+                    console.error(`Error processing order ${order.code}:`, error);
+                    // Consider adding error tracking/monitoring here
+                }
+            })
+        );
+
 
         res.status(200).json({ message: "Cash on delivery success. Please wait for merchant confirm.", isSuccess: true, })
 
@@ -703,12 +826,13 @@ exports.checkoutSuccess = [
 
         const orderCode = session.metadata.orderCode;
         const userId = session.metadata.userId;
+        const totalAmount = +session.metadata.totalAmount;
 
         // Find orders
         const orders = await Order.find({
             code: orderCode,
             userId: userId
-        });
+        }).populate("merchant")
 
         if (!orders || orders.length === 0) {
             return next(new AppError("Invalid order code", 400));
@@ -748,11 +872,12 @@ exports.checkoutSuccess = [
                 // Check if inventory was already reserved during checkout
                 const hasReservedInventory = orders[0].inventoryReserved;
 
+                // Track merchant earnings per merchant
+                const merchantTotals = {};
+
                 if (hasReservedInventory) {
                     // Inventory was reserved - just convert to sold
                     const inventoryOps = [];
-                    // const merchantTotals = {};
-                    const merchantData = {}
 
                     for (const order of orders) {
                         const product = productMap[order.productId.toString()];
@@ -771,15 +896,21 @@ exports.checkoutSuccess = [
                             }
                         });
 
-                        // Calculate merchant earnings
+                        const amount = Math.round(product.price * 100);
+                        const shippingFee = product.shipping * 100;
+                        const total = ((amount + shippingFee) * order.quantity) / 100;
+
+                        // Calculate merchant earnings per merchant
                         if (product.merchant) {
-                            if (!merchantData?.merchantId) {
-                                merchantData.amount = 0;
+                            if (!merchantTotals[product.merchant]) {
+                                merchantTotals[product.merchant] = {
+                                    amount: 0,
+                                    merchantId: product.merchant,
+                                    customer: userId,
+                                    orderCode: orderCode
+                                };
                             }
-                            merchantData.amount += order.quantity * product.price;
-                            merchantData.merchantId = product.merchant
-                            merchantData.customer = userId
-                            merchantData.orderCode = orderCode
+                            merchantTotals[product.merchant].amount += total;
                         }
                     }
 
@@ -788,16 +919,12 @@ exports.checkoutSuccess = [
                         await Product.bulkWrite(inventoryOps, { session: mongoSession });
                     }
 
-                    // Update merchant balances
-                    await updateMerchantBalances(merchantData, mongoSession);
+                    // Update merchant balances for each merchant
+                    await updateMerchantBalances(merchantTotals, mongoSession);
 
                 } else {
                     // No reservation - need to check and deduct inventory atomically
-                    console.log("hit 2");
-
                     const inventoryOps = [];
-                    // const merchantTotals = {};
-                    const merchantData = {}
 
                     for (const order of orders) {
                         const product = productMap[order.productId.toString()];
@@ -829,27 +956,33 @@ exports.checkoutSuccess = [
                             continue;
                         }
 
-                        // Calculate merchant earnings for successful orders
+                        const amount = Math.round(product.price * 100);
+                        const shippingFee = product.shipping * 100;
+                        const total = ((amount + shippingFee) * order.quantity) / 100;
+
+                        // Calculate merchant earnings for successful orders per merchant
                         if (product.merchant) {
-                            if (!merchantData?.merchantId) {
-                                merchantData.amount = 0;
+                            if (!merchantTotals[product.merchant]) {
+                                merchantTotals[product.merchant] = {
+                                    amount: 0,
+                                    merchantId: product.merchant,
+                                    customer: userId,
+                                    orderCode: orderCode
+                                };
                             }
-                            merchantData.amount += order.quantity * product.price;
-                            merchantData.merchantId = product.merchant
-                            merchantData.customer = userId
-                            merchantData.orderCode = orderCode
+                            merchantTotals[product.merchant].amount += total;
                         }
                     }
 
                     // Update merchant balances only for successful orders
                     if (!shouldRefund) {
-                        await updateMerchantBalances(merchantData, mongoSession);
+                        await updateMerchantBalances(merchantTotals, mongoSession);
                     }
                 }
 
                 // Update orders based on success/failure
                 const orderUpdateData = {
-                    stripeSessionId: sessionId,
+                    stripeSessionId: stripe.payment_intent,
                     payment: "stripe",
                     processedAt: new Date()
                 };
@@ -859,7 +992,7 @@ exports.checkoutSuccess = [
                     orderUpdateData.refundReason = refundReason.join(', ');
                 } else {
                     orderUpdateData.isPaid = true;
-                    orderUpdateData.status = "confirm";
+                    orderUpdateData.status = "confirmed";
                     orderUpdateData.paidAt = new Date();
                 }
 
@@ -867,6 +1000,131 @@ exports.checkoutSuccess = [
                     { code: orderCode },
                     { $set: orderUpdateData },
                     { session: mongoSession }
+                );
+
+                if (products.length > 0) {
+                    const startOfDay = new Date();
+                    startOfDay.setHours(0, 0, 0, 0);
+
+                    const endOfDay = new Date();
+                    endOfDay.setHours(23, 59, 59, 999);
+
+                    await Promise.all(
+                        products.map(async (product) => {
+                            const isAlreadyExist = await Analytic.findOne({
+                                product: product._id,
+                                user: req.userId,
+                                category: product.category,
+                                createdAt: { $gte: startOfDay, $lte: endOfDay }
+                            });
+
+                            if (!isAlreadyExist) {
+                                await Analytic.create({
+                                    user: req.userId,
+                                    product: product._id,
+                                    status: "purchase",
+                                    category: product.category
+                                });
+                            }
+                        })
+                    );
+                }
+
+                const date = new Date();
+
+                const formattedDate = date.toLocaleString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true
+                });
+
+                const data = {
+                    orderCode,
+                    totalProducts: products.length,
+                    totalAmount,
+                    date: formattedDate
+                };
+
+                const user = await User.findById(orders[0].userId)
+
+                // Send success email
+                await sendOrderConfirmationEmail(user.email, data);
+                const io = getSocket()
+
+                await Promise.all(
+                    orders.map(async (order) => {
+                        try {
+                            const product = productMap[order.productId.toString()];
+
+                            // Early return if product not found
+                            if (!product) {
+                                console.warn(`Product not found for order ${order.code}`);
+                                return;
+                            }
+
+                            const merchantId = userSocketMap.get(product.merchant);
+
+                            // Only emit if merchant is connected
+                            if (merchantId) {
+                                io.to(merchantId).emit("push-notification", {
+                                    message: "New Paid Order Received.",
+                                    link: "/dashboard/orders"
+                                });
+                            }
+
+                            // Optimize calculations - avoid unnecessary operations
+                            const amount = Math.round(product.price * 100);
+                            const shippingFee = product.shipping * 100;
+                            const total = ((amount + shippingFee) * order.quantity) / 100;
+
+                            // Pre-compute address string to avoid repeated concatenation
+                            const deliveryAddress = `${user.shippingAddresse.street}, ${user.shippingAddresse.city}, ${user.shippingAddresse.state}`;
+
+                            const data = {
+                                merchantName: order.merchant.name,
+                                date: formattedDate,
+                                code: order.code,
+                                customerName: user.name,
+                                customerPhone: user?.phone ?? "",
+                                totalProducts: order.quantity,
+                                totalAmount: total,
+                                deliveryAddress: deliveryAddress,
+                                merchantEarnings: total
+                            };
+
+                            // Parallel execution of email content generation and queue addition
+                            const emailContent = await getCodContent({
+                                filename: "stripeOrder.html",
+                                data: data
+                            });
+
+                            // Add to email queue with optimized options
+                            await emailQueue.add(
+                                "email-user",
+                                {
+                                    receiver: order.merchant.email,
+                                    subject: "You have a new Order",
+                                    html: emailContent,
+                                },
+                                {
+                                    removeOnComplete: 5, // Reduced from default
+                                    removeOnFail: 100,   // Reduced from 1000
+                                    attempts: 3,         // Add retry attempts
+                                    backoff: {
+                                        type: 'exponential',
+                                        delay: 2000
+                                    }
+                                }
+                            );
+
+                        } catch (error) {
+                            console.error(`Error processing order ${order.code}:`, error);
+                            // Consider adding error tracking/monitoring here
+                        }
+                    })
                 );
 
                 // Update product status for zero inventory items (only if not refunding)
@@ -902,9 +1160,6 @@ exports.checkoutSuccess = [
             console.error('Failed to remove order from queue:', queueError);
         }
 
-        // Send success email
-        await sendOrderConfirmationEmail(orders[0].userId, orderCode);
-
         res.status(200).json({
             status: "success",
             isSuccess: true,
@@ -914,47 +1169,34 @@ exports.checkoutSuccess = [
     }),
 ];
 
-async function updateMerchantBalances(merchantData, mongoSession) {
-    if (Object.keys(merchantData).length === 0) return;
+async function updateMerchantBalances(merchantTotals, mongoSession) {
+    if (Object.keys(merchantTotals).length === 0) return;
 
-    // const merchantOps = Object.entries(merchantTotals).map(([merchantId, amount]) => ({
-    //     updateOne: {
-    //         filter: { _id: merchantId },
-    //         update: { $inc: { balance: amount } }
-    //     }
-    // }));
-
-    const merchantOps = [
-        {
-            updateOne: {
-                filter: { _id: merchantData.merchantId },
-                update: { $inc: { balance: merchantData.amount } }
-            }
+    // Create bulk operations for updating merchant balances
+    const merchantOps = Object.entries(merchantTotals).map(([merchantId, merchantData]) => ({
+        updateOne: {
+            filter: { _id: merchantId },
+            update: { $inc: { balance: merchantData.amount } }
         }
-    ];
+    }));
 
     await Seller.bulkWrite(merchantOps, { session: mongoSession });
 
-    // console.log(merchantTotals);
-
-
-    const paymentHistoryOps = [
-        {
-            insertOne: {
-                document: {
-                    customer: merchantData.customer,
-                    paymentMethod: "stripe",
-                    amount: merchantData.amount,
-                    orderCode: merchantData.orderCode,
-                    merchant: merchantData.merchantId,
-                    status: "income"
-                }
+    // Create payment history entries for each merchant
+    const paymentHistoryOps = Object.entries(merchantTotals).map(([merchantId, merchantData]) => ({
+        insertOne: {
+            document: {
+                customer: merchantData.customer,
+                paymentMethod: "stripe",
+                amount: merchantData.amount,
+                orderCode: merchantData.orderCode,
+                merchant: merchantId,
+                status: "income"
             }
         }
-    ];
+    }));
 
     await PaymentHistory.bulkWrite(paymentHistoryOps, { session: mongoSession });
-
 }
 
 async function updateZeroInventoryProducts(productIds, mongoSession) {
@@ -998,8 +1240,6 @@ async function processRefund(session, orderCode, refundReason) {
             }
         );
 
-        console.log(`Order ${orderCode} refunded: ${refundReason.join(', ')}`);
-
     } catch (refundError) {
         console.error('Refund processing failed:', refundError);
 
@@ -1016,19 +1256,19 @@ async function processRefund(session, orderCode, refundReason) {
     }
 }
 
-async function sendOrderConfirmationEmail(userId, orderCode) {
+async function sendOrderConfirmationEmail(email, data) {
     try {
-        const email = await getEmailContent({
+        const emailContent = await getEmailContent({
             filename: "orderSuccess.html",
-            data: { orderCode }
+            data: data
         });
 
         await emailQueue.add(
             "email-user",
             {
-                receiver: "tuntunmyint10182003@gmail.com", // Make this dynamic
+                receiver: email, // Make this dynamic
                 subject: "Ayeyar Market Order Confirmation",
-                html: email,
+                html: emailContent,
             },
             { removeOnComplete: true, removeOnFail: 1000 }
         );

@@ -6,12 +6,14 @@ const Admin = require("../models/adminModel");
 const AppError = require("../utils/appError");
 exports.aliasMessages = (req, res, next) => {
     const user1 = req.userId;
+
+    const id = req.body.id
+    if (!id) {
+        next(new AppError("Id is required."))
+    }
     const user2 = req.body.id;
-
-
     req.query.sort = "timestamp";
     req.query.or = { sender: user1, recipient: user2 }
-
     next();
 };
 
@@ -21,7 +23,6 @@ exports.getAllMessages = factory.getAll({ Model: Message })
 exports.getAdminId = catchAsync(async (req, res, next) => {
     const admin = await Admin.findOne({ email: "admin@gmail.com" }).select("_id")
 
-    console.log(admin);
 
 
     res.status(200).json({
@@ -36,7 +37,6 @@ exports.getAdminId = catchAsync(async (req, res, next) => {
 
 exports.getContactForDMList = catchAsync(async (req, res, next) => {
     const userId = req.userId;
-    console.log(userId);
 
     const admin = await Admin.findById(userId)
 

@@ -79,6 +79,9 @@ exports.signIn = [
         createSendToken({ user, res, statusCode: 200, next });
     })]
 
+
+
+
 exports.signUp = [
     body("email", "Invalid Email").trim("").isEmail().notEmpty(),
     body("password").trim("")
@@ -88,6 +91,11 @@ exports.signUp = [
     body("passwordConfirm").trim("").notEmpty().isLength({ min: 8 })
         .withMessage("Password must be minium of 8 characters."),
     body("name", "Name is required").trim("").notEmpty(),
+    body("city", "City is required.").trim("").notEmpty(),
+    body("country", "City is required.").trim("").notEmpty(),
+    body("street", "City is required.").trim("").notEmpty(),
+    body("state", "City is required.").trim("").notEmpty(),
+    body("postalCode", "City is required.").trim("").notEmpty(),
     catchAsync(async (req, res, next) => {
         const errors = validationResult(req).array({ onlyFirstError: true });
         if (errors.length) {
@@ -97,7 +105,7 @@ exports.signUp = [
             }
             return next(new AppError(errors[0].msg, 400));
         }
-        const { email, password, passwordConfirm, name } = req.body;
+        const { email, password, passwordConfirm, name, state, city, country, street, postalCode, phone } = req.body;
 
         const isUserExit = await User.findOne({ email })
 
@@ -109,7 +117,7 @@ exports.signUp = [
             return next(new AppError("Password are not match", 400))
         }
 
-        const newUser = await Customer.create({ name, password, passwordConfirm, email, randToken: generateRandToken() });
+        const newUser = await Customer.create({ name, password, passwordConfirm, email, randToken: generateRandToken(), shippingAddresse: { state, city, street, country, postalCode }, phone: Number(phone) });
 
         createSendToken({ user: newUser, res, statusCode: 201, next });
     })]

@@ -6,7 +6,7 @@ const { ObjectId } = Schema.Types;
 const paymentCategorySchema = new Schema({
     merchant: {
         type: ObjectId,
-        ref: 'Seller',
+        ref: 'seller',
         required: [true, "Payment method must belong to a seller"]
     },
     pyMethod: {
@@ -56,7 +56,7 @@ const withDrawSchema = new Schema({
     },
     merchant: {
         type: ObjectId,
-        ref: 'Seller',
+        ref: 'seller',
         required: [true, "Withdrawal must belong to a seller"]
     },
     status: {
@@ -83,7 +83,7 @@ const paymentHistory = new Schema({
     merchant: {
         type: ObjectId,
         required: true,
-        ref: 'Seller',
+        ref: 'seller',
     },
     paymentMethod: {
         type: String,

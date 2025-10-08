@@ -201,6 +201,7 @@ const deleteData = async () => {
         await Type.deleteMany()
         await Category.deleteMany()
         await orderModel.deleteMany()
+
         console.log("Data successfully deleted!");
     } catch (err) {
         console.log(err);
